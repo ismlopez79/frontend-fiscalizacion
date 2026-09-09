@@ -9,6 +9,10 @@ interface UserAvatarProps {
   hasPhoto: boolean;
   fallbackText: string;
   size?: number;
+  /** Por defecto trae la foto de /usuarios/{id}/foto-perfil — pasar otra (ej. delegados temporales) para reusar este componente en otros catalogos. */
+  fetchPhoto?: (userId: number) => Promise<Blob>;
+  /** Namespace de la queryKey de react-query — distinto por catalogo para no cruzar cache entre ids de tablas distintas. */
+  cacheNamespace?: string;
 }
 
 /**
@@ -18,10 +22,17 @@ interface UserAvatarProps {
  * y se cachea por userId — cambiar de pagina en la tabla de usuarios no
  * vuelve a pedir los avatares ya vistos.
  */
-export function UserAvatar({ userId, hasPhoto, fallbackText, size = 32 }: UserAvatarProps) {
+export function UserAvatar({
+  userId,
+  hasPhoto,
+  fallbackText,
+  size = 32,
+  fetchPhoto = userApi.getFotoPerfil,
+  cacheNamespace = "foto-perfil",
+}: UserAvatarProps) {
   const query = useQuery({
-    queryKey: ["foto-perfil", userId],
-    queryFn: () => userApi.getFotoPerfil(userId),
+    queryKey: [cacheNamespace, userId],
+    queryFn: () => fetchPhoto(userId),
     enabled: hasPhoto,
     retry: false,
     staleTime: 5 * 60 * 1000,

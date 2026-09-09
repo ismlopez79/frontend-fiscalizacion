@@ -1,0 +1,219 @@
+import { useEffect, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  IconButton,
+  InputAdornment,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import ContentCopyIcon from "@mui/icons-material/ContentCopyOutlined";
+import { temporaryDelegateApi } from "@/api/electoralApi";
+import { getApiErrorMessage } from "@/utils/apiError";
+import type { TemporaryDelegateDto } from "@/types/electoral";
+
+const schema = z.object({
+  newPassword: z.union([z.literal(""), z.string().min(8, "Mínimo 8 caracteres")]),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+interface ResetTemporaryDelegatePasswordDialogProps {
+  open: boolean;
+  delegado: TemporaryDelegateDto | null;
+  onClose: () => void;
+}
+
+/**
+ * Igual criterio que ResetPasswordDialog (usuarios permanentes): el POST
+ * /delegados-temporales/{id}/restablecer-password devuelve la contraseña en
+ * texto plano una unica vez — se muestra y se descarta al cerrar, nunca se
+ * persiste.
+ */
+export function ResetTemporaryDelegatePasswordDialog({
+  open,
+  delegado,
+  onClose,
+}: ResetTemporaryDelegatePasswordDialogProps) {
+  const queryClient = useQueryClient();
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { newPassword: "" },
+  });
+
+  useEffect(() => {
+    if (open) {
+      reset({ newPassword: "" });
+      setSubmitError(null);
+      setTemporaryPassword(null);
+      setShowPassword(false);
+      setCopied(false);
+    }
+  }, [open, reset]);
+
+  const mutation = useMutation({
+    mutationFn: (values: FormValues) => {
+      if (!delegado) throw new Error("Delegado no definido");
+      return temporaryDelegateApi.restablecerPassword(delegado.id, values.newPassword || undefined);
+    },
+    onSuccess: (data) => {
+      setTemporaryPassword(data.temporaryPassword);
+      queryClient.invalidateQueries({ queryKey: ["delegados-temporales"] });
+    },
+    onError: (error) => setSubmitError(getApiErrorMessage(error, "No se pudo restablecer la contraseña.")),
+  });
+
+  const onSubmit = handleSubmit((values) => {
+    setSubmitError(null);
+    mutation.mutate(values);
+  });
+
+  const copyPassword = async () => {
+    if (!temporaryPassword) return;
+    try {
+      await navigator.clipboard.writeText(temporaryPassword);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard no disponible — no es critico.
+    }
+  };
+
+  const handleClose = () => {
+    setTemporaryPassword(null);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Restablecer contraseña</DialogTitle>
+      {temporaryPassword ? (
+        <>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Alert severity="warning" sx={{ borderRadius: "10px" }}>
+                Cópiala y comunícasela ahora: esta es la única vez que se muestra, no queda
+                guardada en ningún otro lugar del sistema.
+              </Alert>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  p: 1.5,
+                  borderRadius: "10px",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: "action.hover",
+                }}
+              >
+                <Typography sx={{ fontFamily: "monospace", fontSize: 16, wordBreak: "break-all" }}>
+                  {temporaryPassword}
+                </Typography>
+                <Tooltip title={copied ? "¡Copiada!" : "Copiar contraseña"}>
+                  <IconButton size="small" onClick={copyPassword}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{delegado?.username}</strong> deberá usarla en su próximo inicio de sesión y
+                cambiarla de inmediato.
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button variant="contained" onClick={handleClose}>
+              Cerrar
+            </Button>
+          </DialogActions>
+        </>
+      ) : (
+        <Box component="form" onSubmit={onSubmit} noValidate>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              Se establecerá una nueva contraseña para <strong>{delegado?.username}</strong>. Déjala
+              vacía para que el sistema genere una automáticamente.
+            </DialogContentText>
+
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {submitError}
+              </Alert>
+            )}
+
+            <Controller
+              name="newPassword"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  autoFocus
+                  label="Nueva contraseña (opcional)"
+                  type={showPassword ? "text" : "password"}
+                  fullWidth
+                  error={!!errors.newPassword}
+                  helperText={
+                    errors.newPassword?.message ??
+                    "Mínimo 8 caracteres, o vacío para generar una automáticamente."
+                  }
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                          onClick={() => setShowPassword((v) => !v)}
+                          edge="end"
+                          size="small"
+                        >
+                          {showPassword ? (
+                            <VisibilityOffOutlinedIcon fontSize="small" />
+                          ) : (
+                            <VisibilityOutlinedIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              )}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleClose} color="inherit">
+              Cancelar
+            </Button>
+            <Button type="submit" variant="contained" disabled={mutation.isPending}>
+              Restablecer
+            </Button>
+          </DialogActions>
+        </Box>
+      )}
+    </Dialog>
+  );
+}

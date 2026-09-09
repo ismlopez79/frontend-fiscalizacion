@@ -12,6 +12,13 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import GroupIcon from "@mui/icons-material/GroupOutlined";
 import VpnKeyIcon from "@mui/icons-material/VpnKeyOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
+import HowToVoteIcon from "@mui/icons-material/HowToVoteOutlined";
+import EventAvailableIcon from "@mui/icons-material/EventAvailableOutlined";
+import PersonPinCircleIcon from "@mui/icons-material/PersonPinCircleOutlined";
+import ApartmentIcon from "@mui/icons-material/ApartmentOutlined";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonthOutlined";
+import QuizIcon from "@mui/icons-material/QuizOutlined";
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedInOutlined";
 
 export interface NavItem {
   label: string;
@@ -71,6 +78,53 @@ export const NAV_ITEMS: NavItem[] = [
         path: "/administracion/auditoria",
         icon: HistoryIcon,
         allowedRoles: ["ADMINISTRADOR"],
+      },
+    ],
+  },
+  {
+    // Sin allowedRoles a proposito: DELEGADO_TEMPORAL/DIGITADOR deben poder
+    // ver este grupo para llegar a "Fiscalización" — cada hijo se filtra
+    // por su propio rol, igual que "Administración" arriba.
+    label: "Elecciones",
+    path: "/elecciones",
+    icon: HowToVoteIcon,
+    children: [
+      { label: "Fiscalización", path: "/fiscalizacion", icon: DescriptionIcon },
+      {
+        label: "Fiscalización pendientes",
+        path: "/fiscalizacion/pendientes-revision",
+        icon: AssignmentTurnedInIcon,
+        allowedRoles: ["SUPERVISOR", "ADMINISTRADOR"],
+      },
+      {
+        label: "Períodos electorales",
+        path: "/elecciones/periodos-electorales",
+        icon: CalendarMonthIcon,
+        allowedRoles: ["ADMINISTRADOR"],
+      },
+      {
+        label: "Delegados temporales",
+        path: "/elecciones/delegados-temporales",
+        icon: PersonPinCircleIcon,
+        allowedRoles: ["ADMINISTRADOR"],
+      },
+      {
+        label: "Centros de servicio",
+        path: "/elecciones/centros-servicio",
+        icon: ApartmentIcon,
+        allowedRoles: ["ADMINISTRADOR"],
+      },
+      {
+        label: "Asignaciones",
+        path: "/elecciones/asignaciones",
+        icon: EventAvailableIcon,
+        allowedRoles: ["ADMINISTRADOR"],
+      },
+      {
+        label: "Preguntas del formulario",
+        path: "/elecciones/preguntas-fiscalizacion",
+        icon: QuizIcon,
+        allowedRoles: ["ADMINISTRADOR", "SUPERVISOR"],
       },
     ],
   },

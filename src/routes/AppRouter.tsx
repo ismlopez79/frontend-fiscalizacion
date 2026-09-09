@@ -22,6 +22,15 @@ import { AuditoriaPage } from "@/pages/administracion/auditoria/AuditoriaPage";
 import { PerfilPage } from "@/pages/perfil/PerfilPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
+import { FiscalizacionListPage } from "@/pages/fiscalizacion/FiscalizacionListPage";
+import { FiscalizacionFormPage } from "@/pages/fiscalizacion/FiscalizacionFormPage";
+import { FiscalizacionDetailPage } from "@/pages/fiscalizacion/FiscalizacionDetailPage";
+import { FiscalizacionPendientesPage } from "@/pages/fiscalizacion/FiscalizacionPendientesPage";
+import { PeriodosElectoralesPage } from "@/pages/elecciones/periodos-electorales/PeriodosElectoralesPage";
+import { DelegadosTemporalesPage } from "@/pages/elecciones/delegados-temporales/DelegadosTemporalesPage";
+import { CentrosServicioPage } from "@/pages/elecciones/centros-servicio/CentrosServicioPage";
+import { AsignacionesPage } from "@/pages/elecciones/asignaciones/AsignacionesPage";
+import { PreguntasFiscalizacionPage } from "@/pages/elecciones/preguntas-fiscalizacion/PreguntasFiscalizacionPage";
 
 const ADMIN_ONLY = ["ADMINISTRADOR"];
 const ADMIN_AND_SUPERVISOR = ["ADMINISTRADOR", "SUPERVISOR"];
@@ -50,11 +59,16 @@ export function AppRouter() {
             <Route path="/actas/:id" element={<ActaDetailPage />} />
             <Route path="/actas/:id/editar" element={<ActaFormPage />} />
 
+            <Route path="/fiscalizacion" element={<FiscalizacionListPage />} />
+            <Route path="/fiscalizacion/nueva" element={<FiscalizacionFormPage />} />
+            <Route path="/fiscalizacion/:id" element={<FiscalizacionDetailPage />} />
+
             <Route path="/perfil" element={<PerfilPage />} />
 
             {/* Solo supervisor/administrador */}
             <Route element={<ProtectedRoute allowedRoles={REVIEWERS} />}>
               <Route path="/actas/pendientes" element={<ActasPendientesPage />} />
+              <Route path="/fiscalizacion/pendientes-revision" element={<FiscalizacionPendientesPage />} />
               <Route path="/reportes" element={<ReportesPage />} />
             </Route>
 
@@ -72,6 +86,19 @@ export function AppRouter() {
               <Route path="/administracion/usuarios" element={<UsuariosPage />} />
               <Route path="/administracion/roles" element={<RolesPage />} />
               <Route path="/administracion/auditoria" element={<AuditoriaPage />} />
+            </Route>
+
+            {/* Elecciones: catalogos operativos (admin + supervisor) */}
+            <Route element={<ProtectedRoute allowedRoles={ADMIN_AND_SUPERVISOR} />}>
+              <Route path="/elecciones/preguntas-fiscalizacion" element={<PreguntasFiscalizacionPage />} />
+            </Route>
+
+            {/* Elecciones: solo administrador */}
+            <Route element={<ProtectedRoute allowedRoles={ADMIN_ONLY} />}>
+              <Route path="/elecciones/periodos-electorales" element={<PeriodosElectoralesPage />} />
+              <Route path="/elecciones/delegados-temporales" element={<DelegadosTemporalesPage />} />
+              <Route path="/elecciones/centros-servicio" element={<CentrosServicioPage />} />
+              <Route path="/elecciones/asignaciones" element={<AsignacionesPage />} />
             </Route>
           </Route>
         </Route>

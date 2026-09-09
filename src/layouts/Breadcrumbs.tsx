@@ -13,10 +13,19 @@ const LABELS: Record<string, string> = {
   duicentros: "Duicentros",
   delegados: "Delegados",
   categorias: "Categorías",
+  "tipos-incidente": "Tipos de incidente",
   usuarios: "Usuarios",
   roles: "Roles y permisos",
   auditoria: "Auditoría",
   perfil: "Mi cuenta",
+  elecciones: "Elecciones",
+  fiscalizacion: "Fiscalización",
+  "pendientes-revision": "Pendientes de revisión",
+  "periodos-electorales": "Períodos electorales",
+  "delegados-temporales": "Delegados temporales",
+  "centros-servicio": "Centros de servicio",
+  asignaciones: "Asignaciones",
+  "preguntas-fiscalizacion": "Preguntas de fiscalización",
 };
 
 export function Breadcrumbs() {
