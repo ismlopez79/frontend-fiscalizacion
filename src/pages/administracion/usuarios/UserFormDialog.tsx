@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Autocomplete,
@@ -15,6 +15,7 @@ import {
   FormControlLabel,
   IconButton,
   InputAdornment,
+  MenuItem,
   Stack,
   Switch,
   TextField,
@@ -23,6 +24,7 @@ import {
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import { userApi } from "@/api/userApi";
+import { catalogApi } from "@/api/catalogApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { DUI_HELPER_TEXT, DUI_REGEX, formatDuiInput } from "@/utils/dui";
 import { DIGITADOR_ROLE_NAME } from "@/types/user";
@@ -49,6 +51,7 @@ const formSchema = z.object({
   roleIds: z.array(z.number()).min(1, "Selecciona al menos un rol"),
   active: z.boolean(),
   delegateInternalCode: z.string().optional(),
+  delegatePoliticalPartyId: z.number().nullable(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -84,12 +87,19 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
       roleIds: [],
       active: true,
       delegateInternalCode: "",
+      delegatePoliticalPartyId: null,
     },
   });
 
   const selectedRoleIds = useWatch({ control, name: "roleIds" }) ?? [];
   const digitadorRole = roles.find((r) => r.name === DIGITADOR_ROLE_NAME);
   const isDigitadorSelected = !!digitadorRole && selectedRoleIds.includes(digitadorRole.id);
+
+  const partidosQuery = useQuery({
+    queryKey: ["partidos-politicos"],
+    queryFn: catalogApi.getPartidosPoliticos,
+    enabled: open,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -108,6 +118,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         // (solo id/nombre), asi que siempre arranca vacio. Se deja vacio a
         // proposito para no sobrescribirlo por accidente al guardar.
         delegateInternalCode: "",
+        delegatePoliticalPartyId: user.linkedDelegatePoliticalPartyId ?? null,
       });
     } else {
       reset({
@@ -119,6 +130,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         roleIds: [],
         active: true,
         delegateInternalCode: "",
+        delegatePoliticalPartyId: null,
       });
     }
   }, [open, isEdit, user, reset]);
@@ -134,6 +146,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         roleIds: values.roleIds,
         active: values.active,
         delegateInternalCode: values.delegateInternalCode || undefined,
+        delegatePoliticalPartyId: values.delegatePoliticalPartyId ?? undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
@@ -155,6 +168,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         // codigo del delegado vinculado con lo que reciba en esta clave,
         // incluso si es "" — mandarla vacia lo borraria sin querer.
         delegateInternalCode: values.delegateInternalCode || undefined,
+        delegatePoliticalPartyId: values.delegatePoliticalPartyId ?? undefined,
       });
     },
     onSuccess: () => {
@@ -321,6 +335,39 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
                   placeholder="JVE-04"
                   helperText="Se aplica al Delegado JVE vinculado a este usuario. Déjalo vacío para no modificar el código actual."
                   {...register("delegateInternalCode")}
+                />
+
+                {isEdit && user && !user.linkedDelegatePoliticalPartyId && (
+                  <Alert severity="warning">
+                    Este usuario no tenía partido político capturado para su delegado JVE. Es
+                    obligatorio a partir de ahora para guardarlo.
+                  </Alert>
+                )}
+
+                <Controller
+                  name="delegatePoliticalPartyId"
+                  control={control}
+                  rules={{
+                    validate: (value) => (isEdit && !value ? "Selecciona un partido político" : true),
+                  }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      select
+                      label={isEdit ? "Partido político del delegado JVE" : "Partido político del delegado JVE (opcional)"}
+                      fullWidth
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    >
+                      <MenuItem value="">{isEdit ? "Selecciona un partido" : "Sin asignar"}</MenuItem>
+                      {(partidosQuery.data ?? []).map((p) => (
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.code} · {p.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
                 />
               </>
             )}

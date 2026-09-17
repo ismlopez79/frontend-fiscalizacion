@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Box,
@@ -34,6 +34,7 @@ const schema = z.object({
     .regex(DUI_REGEX, "Formato inválido, debe ser 12345678-9"),
   type: z.enum(["JVE", "RNPN", "JEFE_DUICENTRO"], { required_error: "Selecciona un tipo" }),
   active: z.boolean(),
+  politicalPartyId: z.number().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -57,7 +58,23 @@ export function DelegadoFormDialog({ open, delegado, onClose }: DelegadoFormDial
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { firstName: "", lastName: "", internalCode: "", dui: "", type: "JVE", active: true },
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      internalCode: "",
+      dui: "",
+      type: "JVE",
+      active: true,
+      politicalPartyId: null,
+    },
+  });
+
+  const watchedType = useWatch({ control, name: "type" });
+
+  const partidosQuery = useQuery({
+    queryKey: ["partidos-politicos"],
+    queryFn: catalogApi.getPartidosPoliticos,
+    enabled: open,
   });
 
   useEffect(() => {
@@ -72,14 +89,27 @@ export function DelegadoFormDialog({ open, delegado, onClose }: DelegadoFormDial
             dui: delegado.dui ?? "",
             type: delegado.type,
             active: delegado.active,
+            politicalPartyId: delegado.politicalPartyId ?? null,
           }
-        : { firstName: "", lastName: "", internalCode: "", dui: "", type: "JVE", active: true }
+        : {
+            firstName: "",
+            lastName: "",
+            internalCode: "",
+            dui: "",
+            type: "JVE",
+            active: true,
+            politicalPartyId: null,
+          }
     );
   }, [open, delegado, reset]);
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
-      const body = { ...values, internalCode: values.internalCode || undefined };
+      const body = {
+        ...values,
+        internalCode: values.internalCode || undefined,
+        politicalPartyId: values.politicalPartyId ?? undefined,
+      };
       return isEdit ? catalogApi.updateDelegado(delegado!.id, body) : catalogApi.createDelegado(body);
     },
     onSuccess: () => {
@@ -169,6 +199,43 @@ export function DelegadoFormDialog({ open, delegado, onClose }: DelegadoFormDial
                 </TextField>
               )}
             />
+
+            {watchedType === "JVE" && (
+              <>
+                {isEdit && delegado && !delegado.politicalPartyId && (
+                  <Alert severity="warning">
+                    Este delegado no tenía partido político capturado. Es obligatorio a partir de
+                    ahora para guardarlo.
+                  </Alert>
+                )}
+
+                <Controller
+                  name="politicalPartyId"
+                  control={control}
+                  rules={{
+                    validate: (value) => (isEdit && !value ? "Selecciona un partido político" : true),
+                  }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      select
+                      label={isEdit ? "Partido político" : "Partido político (opcional)"}
+                      fullWidth
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    >
+                      <MenuItem value="">{isEdit ? "Selecciona un partido" : "Sin asignar"}</MenuItem>
+                      {(partidosQuery.data ?? []).map((p) => (
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.code} · {p.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+              </>
+            )}
 
             <Controller
               name="active"

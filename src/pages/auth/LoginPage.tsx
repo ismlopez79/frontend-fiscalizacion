@@ -16,7 +16,7 @@ import { LoginFormOptions } from "@/components/login/LoginFormOptions";
 import { LoginButton } from "@/components/login/LoginButton";
 import { LoginFooter } from "@/components/login/LoginFooter";
 import { StaggerItem } from "@/components/login/StaggerItem";
-import { getApiErrorCode } from "@/utils/apiError";
+import { getApiErrorCode, getApiErrorMessage } from "@/utils/apiError";
 
 const loginSchema = z.object({
   username: z.string().min(1, "El usuario es obligatorio"),
@@ -29,7 +29,12 @@ export function LoginPage() {
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(
+    // Viene del interceptor global (client.ts): un delegado temporal con
+    // sesion abierta recibio 403 MODULE_DISABLED en algun request y fue
+    // redirigido aqui a la fuerza — ver seccion 4.4 del prompt de frontend.
+    searchParams.get("moduleDisabledMessage")
+  );
   const [remember, setRemember] = useState(true);
 
   const {
@@ -49,10 +54,15 @@ export function LoginPage() {
       const redirectTo = searchParams.get("redirectTo");
       navigate(redirectTo ?? "/dashboard", { replace: true });
     } catch (error) {
-      if (getApiErrorCode(error) === "ACCOUNT_LOCKED") {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode === "ACCOUNT_LOCKED") {
         setLoginError(
           "Su cuenta está bloqueada por demasiados intentos fallidos. Contacte al administrador."
         );
+      } else if (errorCode === "MODULE_DISABLED") {
+        // Delegado temporal con el modulo de Elecciones apagado. El backend
+        // ya manda el mensaje listo para mostrar tal cual (en español).
+        setLoginError(getApiErrorMessage(error));
       } else {
         setLoginError("Usuario o contraseña incorrectos.");
       }

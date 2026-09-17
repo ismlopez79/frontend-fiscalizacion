@@ -17,6 +17,7 @@ const LABELS: Record<string, string> = {
   usuarios: "Usuarios",
   roles: "Roles y permisos",
   auditoria: "Auditoría",
+  modulos: "Módulos del sistema",
   perfil: "Mi cuenta",
   elecciones: "Elecciones",
   fiscalizacion: "Fiscalización",

@@ -1,35 +1,19 @@
 import { createContext, useCallback, useMemo, useState, type ReactNode } from "react";
 import { authApi } from "@/api/authApi";
-import { getStoredToken, setStoredToken } from "@/api/client";
+import { getStoredSession, getStoredToken, setStoredSession, setStoredToken, type StoredSession } from "@/api/client";
 import { isTokenExpired } from "@/utils/jwt";
-import type { AuthScope, AuthUser, LoginRequest, LoginResponse } from "@/types/auth";
+import type { AuthUser, LoginRequest, LoginResponse } from "@/types/auth";
 
 /**
  * Guardamos el token JWT en localStorage y decodificamos su payload de forma
  * ligera (sin libreria extra) solo para leer roles/permisos que el backend
  * ya nos entrega en la respuesta de login. El JWT en si sigue siendo
  * validado exclusivamente por el backend en cada request.
+ *
+ * El storage en si (StoredSession, get/setStoredSession) vive en api/client.ts
+ * porque el interceptor de 403 MODULE_DISABLED tambien necesita leerlo para
+ * saber si el usuario en sesion es DELEGADO_TEMPORAL.
  */
-interface StoredSession {
-  username: string;
-  fullName: string;
-  roles: string[];
-  primerIngreso: boolean;
-  scope: AuthScope;
-}
-
-const SESSION_STORAGE_KEY = "jve_auth_session";
-
-function readStoredSession(): StoredSession | null {
-  const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as StoredSession;
-  } catch {
-    return null;
-  }
-}
-
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
@@ -59,20 +43,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token) setStoredToken(null);
       return null;
     }
-    return readStoredSession();
+    return getStoredSession();
   });
   const [isLoading, setIsLoading] = useState(false);
 
   const applyAuthResponse = useCallback((response: LoginResponse) => {
     setStoredToken(response.token);
-    const newSession: StoredSession = {
+    const newSession = {
       username: response.username,
       fullName: response.fullName,
       roles: response.roles,
       primerIngreso: response.primerIngreso,
       scope: response.scope,
     };
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(newSession));
+    setStoredSession(newSession);
     setSession(newSession);
   }, []);
 
@@ -92,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setStoredToken(null);
-    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setStoredSession(null);
     setSession(null);
   }, []);
 

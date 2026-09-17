@@ -19,6 +19,8 @@ import ApartmentIcon from "@mui/icons-material/ApartmentOutlined";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonthOutlined";
 import QuizIcon from "@mui/icons-material/QuizOutlined";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedInOutlined";
+import ExtensionIcon from "@mui/icons-material/ExtensionOutlined";
+import FlagIcon from "@mui/icons-material/FlagOutlined";
 
 export interface NavItem {
   label: string;
@@ -26,6 +28,16 @@ export interface NavItem {
   icon: SvgIconComponent;
   /** Roles que pueden ver este item. Si se omite, es visible para cualquier usuario autenticado. */
   allowedRoles?: string[];
+  /**
+   * Si es true, el item se oculta cuando GET /modulos reporta ELECTIONS
+   * apagado — refleja que FORM_CREATE/FORM_EDIT_OWN/FORM_VIEW_ALL/FORM_REVIEW
+   * dejan de estar disponibles para todos los roles mientras el modulo este
+   * apagado. Las paginas de preparacion de la proxima eleccion (periodos,
+   * delegados temporales, centros, asignaciones, preguntas) NO llevan esta
+   * bandera: esos permisos de gestion nunca se gatean, el admin los necesita
+   * con el modulo apagado.
+   */
+  requiresElectionsModule?: boolean;
   children?: NavItem[];
 }
 
@@ -59,6 +71,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: "Departamentos", path: "/administracion/departamentos", icon: MapIcon },
       { label: "Duicentros", path: "/administracion/duicentros", icon: StoreIcon },
       { label: "Delegados", path: "/administracion/delegados", icon: BadgeIcon },
+      { label: "Partidos políticos", path: "/administracion/partidos-politicos", icon: FlagIcon },
       { label: "Categorías de producción", path: "/administracion/categorias", icon: CategoryIcon },
       { label: "Tipos de incidente", path: "/administracion/tipos-incidente", icon: WarningAmberIcon },
       {
@@ -79,6 +92,12 @@ export const NAV_ITEMS: NavItem[] = [
         icon: HistoryIcon,
         allowedRoles: ["ADMINISTRADOR"],
       },
+      {
+        label: "Módulos del sistema",
+        path: "/administracion/modulos",
+        icon: ExtensionIcon,
+        allowedRoles: ["ADMINISTRADOR"],
+      },
     ],
   },
   {
@@ -89,12 +108,18 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/elecciones",
     icon: HowToVoteIcon,
     children: [
-      { label: "Fiscalización", path: "/fiscalizacion", icon: DescriptionIcon },
+      {
+        label: "Fiscalización",
+        path: "/fiscalizacion",
+        icon: DescriptionIcon,
+        requiresElectionsModule: true,
+      },
       {
         label: "Fiscalización pendientes",
         path: "/fiscalizacion/pendientes-revision",
         icon: AssignmentTurnedInIcon,
         allowedRoles: ["SUPERVISOR", "ADMINISTRADOR"],
+        requiresElectionsModule: true,
       },
       {
         label: "Períodos electorales",

@@ -27,6 +27,13 @@ export interface TemporaryDelegateDto {
   primerIngreso: boolean;
   locked: boolean;
   profilePhotoUrl: string | null;
+  /**
+   * Partido a nombre del cual fiscaliza. Opcional al crear (puede entrar por
+   * carga masiva sin este dato), pero obligatorio al editar — ver
+   * UpdateTemporaryDelegateRequest.
+   */
+  politicalPartyId: number | null;
+  politicalPartyName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +46,8 @@ export interface CreateTemporaryDelegateRequest {
   /** Opcional — si se omite, el backend lo deriva del dui. */
   username?: string;
   electoralPeriodId: number;
+  /** Opcional al crear. */
+  politicalPartyId?: number;
 }
 
 /** username es inmutable, igual que en /usuarios — por eso no aparece aqui. */
@@ -48,6 +57,8 @@ export interface UpdateTemporaryDelegateRequest {
   email?: string;
   electoralPeriodId: number;
   active: boolean;
+  /** Obligatorio en la practica: el backend responde 400 VALIDATION_ERROR si se omite. */
+  politicalPartyId?: number;
 }
 
 export interface ServiceCenterDto {

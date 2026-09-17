@@ -11,6 +11,7 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import { userApi, roleApi } from "@/api/userApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +59,7 @@ export function UsuariosPage() {
         dui: target.dui ?? "",
         roleIds: target.roleIds,
         active: !target.active,
+        delegatePoliticalPartyId: target.linkedDelegatePoliticalPartyId ?? undefined,
       }),
     onSuccess: (_data, target) => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
@@ -134,6 +136,31 @@ export function UsuariosPage() {
         },
       },
       {
+        field: "linkedDelegatePoliticalPartyName",
+        headerName: "Partido político",
+        flex: 1,
+        minWidth: 190,
+        sortable: false,
+        renderCell: (params) => {
+          const isDigitador = params.row.roles.includes(DIGITADOR_ROLE_NAME);
+          if (!isDigitador) return <span>—</span>;
+          if (params.row.linkedDelegatePoliticalPartyId) {
+            return <span>{params.row.linkedDelegatePoliticalPartyName}</span>;
+          }
+          return (
+            <Tooltip title="Delegado JVE vinculado sin partido político asignado. Edítalo para completarlo.">
+              <Chip
+                size="small"
+                label="Falta partido"
+                color="warning"
+                variant="outlined"
+                icon={<WarningAmberIcon fontSize="small" />}
+              />
+            </Tooltip>
+          );
+        },
+      },
+      {
         field: "estadoCuenta",
         headerName: "Estado de acceso",
         flex: 1,
@@ -196,6 +223,7 @@ export function UsuariosPage() {
           const target = params.row;
           const isSelf = target.username === currentUser?.username;
           const missingDui = !target.dui;
+          const missingParty = target.roles.includes(DIGITADOR_ROLE_NAME) && !target.linkedDelegatePoliticalPartyId;
           return (
             <Stack direction="row" spacing={0.5}>
               <Tooltip title="Editar usuario">
@@ -217,15 +245,17 @@ export function UsuariosPage() {
                     ? "No puedes desactivar tu propia cuenta"
                     : missingDui
                       ? "Este usuario no tiene DUI capturado. Edítalo primero para poder cambiar su estado."
-                      : target.active
-                        ? "Desactivar usuario"
-                        : "Activar usuario"
+                      : missingParty
+                        ? "Este usuario no tiene partido político asignado a su delegado JVE. Edítalo primero para poder cambiar su estado."
+                        : target.active
+                          ? "Desactivar usuario"
+                          : "Activar usuario"
                 }
               >
                 <span>
                   <IconButton
                     size="small"
-                    disabled={isSelf || missingDui || toggleActiveMutation.isPending}
+                    disabled={isSelf || missingDui || missingParty || toggleActiveMutation.isPending}
                     onClick={() => toggleActiveMutation.mutate(target)}
                   >
                     {target.active ? (

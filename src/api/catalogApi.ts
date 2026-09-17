@@ -8,6 +8,8 @@ import type {
   DuicentroRequest,
   IncidentTypeDto,
   IncidentTypeRequest,
+  PoliticalPartyDto,
+  PoliticalPartyRequest,
   ProductionCategoryDto,
   ProductionCategoryRequest,
 } from "@/types/catalog";
@@ -101,6 +103,23 @@ export const catalogApi = {
     body: ProductionCategoryRequest
   ): Promise<ProductionCategoryDto> => {
     const { data } = await apiClient.put<ProductionCategoryDto>(`/categorias/${id}`, body);
+    return data;
+  },
+
+  getPartidosPoliticos: async (): Promise<PoliticalPartyDto[]> => {
+    const { data } = await apiClient.get<PoliticalPartyDto[]>("/partidos-politicos");
+    return data;
+  },
+  getPartidosPoliticosTodos: async (): Promise<PoliticalPartyDto[]> => {
+    const { data } = await apiClient.get<PoliticalPartyDto[]>("/partidos-politicos/todos");
+    return data;
+  },
+  createPartidoPolitico: async (body: PoliticalPartyRequest): Promise<PoliticalPartyDto> => {
+    const { data } = await apiClient.post<PoliticalPartyDto>("/partidos-politicos", body);
+    return data;
+  },
+  updatePartidoPolitico: async (id: number, body: PoliticalPartyRequest): Promise<PoliticalPartyDto> => {
+    const { data } = await apiClient.put<PoliticalPartyDto>(`/partidos-politicos/${id}`, body);
     return data;
   },
 

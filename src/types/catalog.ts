@@ -29,6 +29,19 @@ export interface DuicentroRequest {
   active: boolean;
 }
 
+export interface PoliticalPartyDto {
+  id: number;
+  code: string;
+  name: string;
+  active: boolean;
+}
+
+export interface PoliticalPartyRequest {
+  code: string;
+  name: string;
+  active: boolean;
+}
+
 export type DelegateType = "JVE" | "RNPN" | "JEFE_DUICENTRO";
 
 export const DELEGATE_TYPES: DelegateType[] = ["JVE", "RNPN", "JEFE_DUICENTRO"];
@@ -60,6 +73,19 @@ export interface DelegateDto {
    * sincronizacion.
    */
   linkedUsername: string | null;
+  /**
+   * Partido politico que representa este delegado. Solo aplica a type
+   * "JVE" (RNPN y JEFE_DUICENTRO no llevan partido) — ver partyRequired.
+   * Null si aun no se ha capturado (posible al crear, no al editar).
+   */
+  politicalPartyId: number | null;
+  politicalPartyName: string | null;
+  /**
+   * true cuando type === "JVE": el backend exige politicalPartyId al editar
+   * (409 si se omite), aunque es opcional al crear. Viaja calculado desde
+   * el backend para no duplicar esa regla en el frontend.
+   */
+  partyRequired: boolean;
 }
 
 export interface DelegateRequest {
@@ -70,6 +96,8 @@ export interface DelegateRequest {
   dui: string;
   type: DelegateType;
   active: boolean;
+  /** Opcional al crear; obligatorio al editar un delegado JVE (409 si se omite). */
+  politicalPartyId?: number | null;
 }
 
 export interface ProductionCategoryDto {

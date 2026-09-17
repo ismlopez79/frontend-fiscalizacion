@@ -14,11 +14,13 @@ import { ReportesPage } from "@/pages/reportes/ReportesPage";
 import { DepartamentosPage } from "@/pages/administracion/departamentos/DepartamentosPage";
 import { DuicentrosPage } from "@/pages/administracion/duicentros/DuicentrosPage";
 import { DelegadosPage } from "@/pages/administracion/delegados/DelegadosPage";
+import { PartidosPoliticosPage } from "@/pages/administracion/partidos-politicos/PartidosPoliticosPage";
 import { CategoriasPage } from "@/pages/administracion/categorias/CategoriasPage";
 import { TiposIncidentePage } from "@/pages/administracion/tipos-incidente/TiposIncidentePage";
 import { UsuariosPage } from "@/pages/administracion/usuarios/UsuariosPage";
 import { RolesPage } from "@/pages/administracion/roles/RolesPage";
 import { AuditoriaPage } from "@/pages/administracion/auditoria/AuditoriaPage";
+import { ModulosPage } from "@/pages/administracion/modulos/ModulosPage";
 import { PerfilPage } from "@/pages/perfil/PerfilPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
@@ -77,6 +79,7 @@ export function AppRouter() {
               <Route path="/administracion/departamentos" element={<DepartamentosPage />} />
               <Route path="/administracion/duicentros" element={<DuicentrosPage />} />
               <Route path="/administracion/delegados" element={<DelegadosPage />} />
+              <Route path="/administracion/partidos-politicos" element={<PartidosPoliticosPage />} />
               <Route path="/administracion/categorias" element={<CategoriasPage />} />
               <Route path="/administracion/tipos-incidente" element={<TiposIncidentePage />} />
             </Route>
@@ -86,6 +89,7 @@ export function AppRouter() {
               <Route path="/administracion/usuarios" element={<UsuariosPage />} />
               <Route path="/administracion/roles" element={<RolesPage />} />
               <Route path="/administracion/auditoria" element={<AuditoriaPage />} />
+              <Route path="/administracion/modulos" element={<ModulosPage />} />
             </Route>
 
             {/* Elecciones: catalogos operativos (admin + supervisor) */}

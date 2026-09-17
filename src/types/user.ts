@@ -24,6 +24,13 @@ export interface UserDto {
   linkedDelegateId: number | null;
   linkedDelegateName: string | null;
   /**
+   * Partido politico del Delegado JVE vinculado (ver linkedDelegateId). Solo
+   * aplica si el usuario tiene rol DIGITADOR. Null si aun no se ha
+   * capturado — es la señal para resaltarlo en el listado.
+   */
+  linkedDelegatePoliticalPartyId: number | null;
+  linkedDelegatePoliticalPartyName: string | null;
+  /**
    * Null si el usuario no ha subido foto de perfil. No es un <img src> listo
    * para usar a secas (el endpoint requiere el header Authorization) — solo
    * se usa aqui como señal de "tiene foto o no"; el fetch autenticado real
@@ -53,6 +60,8 @@ export interface CreateUserRequest {
   active: boolean;
   /** Solo importa si roleIds incluye DIGITADOR: alimenta el Delegado JVE vinculado. */
   delegateInternalCode?: string;
+  /** Solo importa si roleIds incluye DIGITADOR. Opcional al crear. */
+  delegatePoliticalPartyId?: number;
 }
 
 export interface UpdateUserRequest {
@@ -69,6 +78,8 @@ export interface UpdateUserRequest {
    * completo (no mandarla como "") cuando el admin no quiso tocarla.
    */
   delegateInternalCode?: string;
+  /** Solo importa si roleIds incluye DIGITADOR. Obligatorio al editar (409 si se omite). */
+  delegatePoliticalPartyId?: number;
 }
 
 export interface ResetPasswordRequest {

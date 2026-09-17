@@ -21,6 +21,7 @@ import EditIcon from "@mui/icons-material/EditOutlined";
 import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import { catalogApi } from "@/api/catalogApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { DELEGATE_TYPES, DELEGATE_TYPE_LABELS } from "@/types/catalog";
@@ -55,6 +56,7 @@ export function DelegadosPage() {
         dui: target.dui ?? "",
         type: target.type,
         active: !target.active,
+        politicalPartyId: target.politicalPartyId ?? undefined,
       }),
     onSuccess: (_data, target) => {
       queryClient.invalidateQueries({ queryKey: ["delegados"] });
@@ -89,6 +91,27 @@ export function DelegadosPage() {
         headerName: "Tipo",
         width: 170,
         valueGetter: (_v, row) => DELEGATE_TYPE_LABELS[row.type] ?? row.type,
+      },
+      {
+        field: "politicalPartyName",
+        headerName: "Partido político",
+        width: 200,
+        sortable: false,
+        renderCell: (params) => {
+          if (!params.row.partyRequired) return <span>—</span>;
+          if (params.row.politicalPartyId) return <span>{params.row.politicalPartyName}</span>;
+          return (
+            <Tooltip title="Delegado JVE sin partido político asignado. Edítalo para completarlo.">
+              <Chip
+                size="small"
+                label="Falta partido"
+                color="warning"
+                variant="outlined"
+                icon={<WarningAmberIcon fontSize="small" />}
+              />
+            </Tooltip>
+          );
+        },
       },
       {
         field: "linkedUsername",
@@ -134,6 +157,7 @@ export function DelegadosPage() {
         renderCell: (params) => {
           const isLinked = !!params.row.linkedUsername;
           const missingDui = !params.row.dui;
+          const missingParty = params.row.partyRequired && !params.row.politicalPartyId;
           return (
             <Stack direction="row" spacing={0.5}>
               <Tooltip
@@ -159,15 +183,17 @@ export function DelegadosPage() {
                     ? "Vinculado a un usuario: su estado se sincroniza desde Usuarios."
                     : missingDui
                       ? "Este delegado no tiene DUI capturado. Edítalo primero para poder cambiar su estado."
-                      : params.row.active
-                        ? "Desactivar"
-                        : "Activar"
+                      : missingParty
+                        ? "Este delegado no tiene partido político asignado. Edítalo primero para poder cambiar su estado."
+                        : params.row.active
+                          ? "Desactivar"
+                          : "Activar"
                 }
               >
                 <span>
                   <IconButton
                     size="small"
-                    disabled={isLinked || missingDui || toggleActiveMutation.isPending}
+                    disabled={isLinked || missingDui || missingParty || toggleActiveMutation.isPending}
                     onClick={() => toggleActiveMutation.mutate(params.row)}
                   >
                     {params.row.active ? (

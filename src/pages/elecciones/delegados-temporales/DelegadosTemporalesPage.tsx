@@ -12,6 +12,7 @@ import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
 import CloseIcon from "@mui/icons-material/CloseRounded";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import { temporaryDelegateApi } from "@/api/electoralApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useActiveElectoralPeriod } from "@/hooks/useActiveElectoralPeriod";
@@ -87,6 +88,7 @@ export function DelegadosTemporalesPage() {
         email: target.email ?? undefined,
         electoralPeriodId: target.electoralPeriodId,
         active: !target.active,
+        politicalPartyId: target.politicalPartyId ?? undefined,
       }),
     onSuccess: (_data, target) => {
       queryClient.invalidateQueries({ queryKey: ["delegados-temporales"] });
@@ -124,6 +126,26 @@ export function DelegadosTemporalesPage() {
         valueGetter: (_v, row) => row.email ?? "—",
       },
       { field: "electoralPeriodName", headerName: "Período", flex: 1, minWidth: 180 },
+      {
+        field: "politicalPartyName",
+        headerName: "Partido político",
+        width: 200,
+        sortable: false,
+        renderCell: (params) => {
+          if (params.row.politicalPartyId) return <span>{params.row.politicalPartyName}</span>;
+          return (
+            <Tooltip title="Delegado temporal sin partido político asignado. Edítalo para completarlo.">
+              <Chip
+                size="small"
+                label="Falta partido"
+                color="warning"
+                variant="outlined"
+                icon={<WarningAmberIcon fontSize="small" />}
+              />
+            </Tooltip>
+          );
+        },
+      },
       {
         field: "estadoCuenta",
         headerName: "Estado de acceso",
@@ -180,6 +202,7 @@ export function DelegadosTemporalesPage() {
         filterable: false,
         renderCell: (params) => {
           const target = params.row;
+          const missingParty = !target.politicalPartyId;
           return (
             <Stack direction="row" spacing={0.5}>
               <Tooltip title="Editar">
@@ -192,18 +215,28 @@ export function DelegadosTemporalesPage() {
                   <KeyIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <Tooltip title={target.active ? "Desactivar" : "Activar"}>
-                <IconButton
-                  size="small"
-                  disabled={toggleActiveMutation.isPending}
-                  onClick={() => toggleActiveMutation.mutate(target)}
-                >
-                  {target.active ? (
-                    <ToggleOnIcon fontSize="small" color="success" />
-                  ) : (
-                    <ToggleOffIcon fontSize="small" />
-                  )}
-                </IconButton>
+              <Tooltip
+                title={
+                  missingParty
+                    ? "Este delegado no tiene partido político asignado. Edítalo primero para poder cambiar su estado."
+                    : target.active
+                      ? "Desactivar"
+                      : "Activar"
+                }
+              >
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={missingParty || toggleActiveMutation.isPending}
+                    onClick={() => toggleActiveMutation.mutate(target)}
+                  >
+                    {target.active ? (
+                      <ToggleOnIcon fontSize="small" color="success" />
+                    ) : (
+                      <ToggleOffIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </span>
               </Tooltip>
             </Stack>
           );

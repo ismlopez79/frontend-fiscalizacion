@@ -40,15 +40,19 @@ export function getApiErrorMessage(error: unknown, fallback = "Ocurrió un error
 
 /**
  * Codigo corto del error (INVALID_CREDENTIALS, ACCOUNT_LOCKED,
- * BUSINESS_RULE_VIOLATION, VALIDATION_ERROR, ...) para cuando el mismo
- * status HTTP puede significar cosas distintas segun el codigo (ej. login
- * vs cambio de contraseña, ambos con 401).
+ * BUSINESS_RULE_VIOLATION, VALIDATION_ERROR, MODULE_DISABLED, ...) para
+ * cuando el mismo status HTTP puede significar cosas distintas segun el
+ * codigo (ej. login vs cambio de contraseña, ambos con 401).
+ *
+ * El campo viaja como "error" en la mayoria de endpoints y como "code" en
+ * los del modulo de Elecciones — se revisan ambos.
  */
 export function getApiErrorCode(error: unknown): string | undefined {
   if (!(error instanceof AxiosError)) {
     return undefined;
   }
-  return (error.response?.data as Partial<ApiErrorResponse> | undefined)?.error;
+  const data = error.response?.data as Partial<ApiErrorResponse> | undefined;
+  return data?.code ?? data?.error;
 }
 
 /**

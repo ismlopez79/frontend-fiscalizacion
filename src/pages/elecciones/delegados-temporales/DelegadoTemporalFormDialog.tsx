@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Box,
@@ -19,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import { temporaryDelegateApi } from "@/api/electoralApi";
+import { catalogApi } from "@/api/catalogApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { DUI_HELPER_TEXT, DUI_REGEX, formatDuiInput } from "@/utils/dui";
 import type { ElectoralPeriodDto, TemporaryDelegateDto } from "@/types/electoral";
@@ -30,6 +31,7 @@ const schema = z.object({
   username: z.string().optional(),
   electoralPeriodId: z.number({ invalid_type_error: "Selecciona un período" }).min(1, "Selecciona un período"),
   active: z.boolean(),
+  politicalPartyId: z.number().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -64,7 +66,21 @@ export function DelegadoTemporalFormDialog({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { fullName: "", dui: "", email: "", username: "", electoralPeriodId: 0, active: true },
+    defaultValues: {
+      fullName: "",
+      dui: "",
+      email: "",
+      username: "",
+      electoralPeriodId: 0,
+      active: true,
+      politicalPartyId: null,
+    },
+  });
+
+  const partidosQuery = useQuery({
+    queryKey: ["partidos-politicos"],
+    queryFn: catalogApi.getPartidosPoliticos,
+    enabled: open,
   });
 
   useEffect(() => {
@@ -79,6 +95,7 @@ export function DelegadoTemporalFormDialog({
             username: delegado.username,
             electoralPeriodId: delegado.electoralPeriodId,
             active: delegado.active,
+            politicalPartyId: delegado.politicalPartyId ?? null,
           }
         : {
             fullName: "",
@@ -87,6 +104,7 @@ export function DelegadoTemporalFormDialog({
             username: "",
             electoralPeriodId: defaultElectoralPeriodId ?? 0,
             active: true,
+            politicalPartyId: null,
           }
     );
   }, [open, delegado, defaultElectoralPeriodId, reset]);
@@ -94,6 +112,7 @@ export function DelegadoTemporalFormDialog({
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const email = values.email || undefined;
+      const politicalPartyId = values.politicalPartyId ?? undefined;
       if (isEdit) {
         return temporaryDelegateApi.updateDelegadoTemporal(delegado!.id, {
           fullName: values.fullName,
@@ -101,6 +120,7 @@ export function DelegadoTemporalFormDialog({
           email,
           electoralPeriodId: values.electoralPeriodId,
           active: values.active,
+          politicalPartyId,
         });
       }
       return temporaryDelegateApi.createDelegadoTemporal({
@@ -109,6 +129,7 @@ export function DelegadoTemporalFormDialog({
         email,
         username: values.username || undefined,
         electoralPeriodId: values.electoralPeriodId,
+        politicalPartyId,
       });
     },
     onSuccess: (data) => {
@@ -199,6 +220,39 @@ export function DelegadoTemporalFormDialog({
                   {periodos.map((p) => (
                     <MenuItem key={p.id} value={p.id}>
                       {p.name} {p.active ? "· activo" : ""}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            />
+
+            {isEdit && delegado && !delegado.politicalPartyId && (
+              <Alert severity="warning">
+                Este delegado no tenía partido político capturado. Es obligatorio a partir de
+                ahora para guardarlo.
+              </Alert>
+            )}
+
+            <Controller
+              name="politicalPartyId"
+              control={control}
+              rules={{
+                validate: (value) => (isEdit && !value ? "El partido político es obligatorio al editar" : true),
+              }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  select
+                  label={isEdit ? "Partido político" : "Partido político (opcional)"}
+                  fullWidth
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
+                >
+                  <MenuItem value="">{isEdit ? "Selecciona un partido" : "Sin asignar"}</MenuItem>
+                  {(partidosQuery.data ?? []).map((p) => (
+                    <MenuItem key={p.id} value={p.id}>
+                      {p.code} · {p.name}
                     </MenuItem>
                   ))}
                 </TextField>

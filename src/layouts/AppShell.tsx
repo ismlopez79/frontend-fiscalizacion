@@ -30,14 +30,17 @@ import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfilePhoto } from "@/hooks/useMyProfilePhoto";
+import { useModulos } from "@/hooks/useModulos";
 import { NAV_ITEMS, type NavItem } from "./navConfig";
 import { Breadcrumbs } from "./Breadcrumbs";
 import logo from "@/logo/logo.png";
 
 const DRAWER_WIDTH = 264;
 
-function isVisible(item: NavItem, roles: string[]): boolean {
-  return !item.allowedRoles || item.allowedRoles.some((r) => roles.includes(r));
+function isVisible(item: NavItem, roles: string[], isElectionsEnabled: boolean): boolean {
+  const roleOk = !item.allowedRoles || item.allowedRoles.some((r) => roles.includes(r));
+  const moduleOk = !item.requiresElectionsModule || isElectionsEnabled;
+  return roleOk && moduleOk;
 }
 
 export function AppShell() {
@@ -45,6 +48,10 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const photoUrl = useMyProfilePhoto();
+  // No solo en login: se llama aqui (AppShell envuelve toda ruta protegida)
+  // porque el estado del modulo puede cambiar en caliente mientras el
+  // usuario ya tiene sesion abierta — ver seccion 4.2 del prompt.
+  const { isElectionsEnabled } = useModulos();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ "/administracion": true });
@@ -58,9 +65,16 @@ export function AppShell() {
   };
 
   const renderNavItem = (item: NavItem, depth = 0) => {
-    if (!isVisible(item, roles)) return null;
+    if (!isVisible(item, roles, isElectionsEnabled)) return null;
 
-    const hasChildren = item.children && item.children.length > 0;
+    const visibleChildren = item.children?.filter((child) => isVisible(child, roles, isElectionsEnabled)) ?? [];
+    // Grupo (ej. "Elecciones") sin ningun hijo visible — ej. DIGITADOR
+    // con el modulo apagado solo veria "Fiscalización", que tambien se
+    // oculta: no tiene sentido mostrar un grupo vacio que se despliega
+    // a nada.
+    if (item.children && item.children.length > 0 && visibleChildren.length === 0) return null;
+
+    const hasChildren = visibleChildren.length > 0;
     const isOpen = openGroups[item.path] ?? false;
     const isActive = location.pathname.startsWith(item.path) && depth === 0 && !hasChildren;
 
@@ -89,7 +103,7 @@ export function AppShell() {
           </ListItemButton>
           <Collapse in={isOpen} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {item.children!.map((child) => renderNavItem(child, depth + 1))}
+              {visibleChildren.map((child) => renderNavItem(child, depth + 1))}
             </List>
           </Collapse>
         </Box>
