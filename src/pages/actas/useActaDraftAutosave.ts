@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AxiosError } from "axios";
 import { actaApi } from "@/api/actaApi";
 import { getApiErrorCode } from "@/utils/apiError";
-import type { ActaBorradorActivo, ActaDraftSnapshot, ActaResponse } from "@/types/acta";
+import type {
+  ActaBorradorActivo,
+  ActaDraftSnapshot,
+  ActaPracticaResponse,
+  ActaResponse,
+  CreateActaRequest,
+} from "@/types/acta";
 
 export type { ActaDraftSnapshot };
 
@@ -25,8 +31,36 @@ const AUTOSAVE_DEBOUNCE_MS = 2000;
 /** Si el digitador no deja de teclear, fuerza un guardado cada 10s en vez de esperar indefinidamente el silencio. */
 const AUTOSAVE_MAX_WAIT_MS = 10000;
 
+/**
+ * En modo practica `username` llega con un prefijo propio (ver
+ * useActaDraftAutosave): el borrador de practica nunca se mezcla con el
+ * respaldo del borrador real de la misma persona.
+ */
 function storageKey(username: string): string {
   return `jve_acta_draft_${username}`;
+}
+
+/**
+ * Cuerpo de POST /practica/actas y de PUT /actas/{id} (mismo shape que
+ * POST /actas) a partir de la instantanea del formulario.
+ */
+export function snapshotToCreateRequest(snapshot: ActaDraftSnapshot): CreateActaRequest {
+  const c = snapshot.content ?? {};
+  return {
+    departmentId: snapshot.departmentId,
+    duicentroId: snapshot.duicentroId,
+    actaDate: snapshot.actaDate,
+    arrivalTime: c.arrivalTime ?? undefined,
+    departureTime: c.departureTime ?? undefined,
+    jveDelegateId: c.jveDelegateId ?? undefined,
+    rnpnDelegateName: c.rnpnDelegateName ?? undefined,
+    duicentroChiefName: c.duicentroChiefName ?? undefined,
+    observations: c.observations ?? undefined,
+    declaredTotal: c.declaredTotal ?? undefined,
+    producciones: c.producciones ?? [],
+    incidentes: c.incidentes ?? [],
+    acompananteIds: c.acompananteIds ?? [],
+  };
 }
 
 function loadLocalSnapshot(username: string): ActaDraftSnapshot | null {
@@ -99,7 +133,8 @@ function hasRealContent(snapshot: ActaDraftSnapshot): boolean {
     !!c.observations ||
     c.declaredTotal !== undefined ||
     hasProduccionContent ||
-    hasIncidenteContent
+    hasIncidenteContent ||
+    (c.acompananteIds ?? []).length > 0
   );
 }
 
@@ -131,9 +166,16 @@ interface UseActaDraftAutosaveParams {
   username: string;
   /** false en pantallas donde este flujo no aplica (ej. "editar" una acta ya existente) — evita el GET de borrador-activo y deja todo en no-op. */
   enabled?: boolean;
+  /**
+   * Modo practica: el borrador vive SOLO en el navegador (nunca se llama a
+   * /actas/borrador ni /actas/{id}/finalizar, que si guardan) y finalize()
+   * manda un unico POST /practica/actas, que no registra nada.
+   */
+  practice?: boolean;
 }
 
-export function useActaDraftAutosave({ username, enabled = true }: UseActaDraftAutosaveParams) {
+export function useActaDraftAutosave({ username: realUsername, enabled = true, practice = false }: UseActaDraftAutosaveParams) {
+  const username = practice ? `practica_${realUsername}` : realUsername;
   const [loadingInitial, setLoadingInitial] = useState(enabled);
   const [initialSnapshot, setInitialSnapshot] = useState<ActaDraftSnapshot | null>(null);
   const [draftId, setDraftId] = useState<number | null>(null);
@@ -155,6 +197,12 @@ export function useActaDraftAutosave({ username, enabled = true }: UseActaDraftA
   // blanco si tampoco hay eso).
   useEffect(() => {
     if (!enabled) {
+      setLoadingInitial(false);
+      return;
+    }
+    if (practice) {
+      const local = loadLocalSnapshot(username);
+      if (local && hasRealContent(local)) setInitialSnapshot(local);
       setLoadingInitial(false);
       return;
     }
@@ -186,7 +234,7 @@ export function useActaDraftAutosave({ username, enabled = true }: UseActaDraftA
     return () => {
       cancelled = true;
     };
-  }, [username, enabled]);
+  }, [username, enabled, practice]);
 
   const markDraftGone = useCallback(() => {
     draftIdRef.current = null;
@@ -286,6 +334,9 @@ export function useActaDraftAutosave({ username, enabled = true }: UseActaDraftA
       saveLocalSnapshot(username, snapshot);
       latestSnapshotRef.current = snapshot;
 
+      // Practica: el respaldo local de arriba es todo; nunca se programa el
+      // autoguardado al backend.
+      if (practice) return;
       if (!hasMinimumFields(snapshot)) return;
 
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -301,7 +352,7 @@ export function useActaDraftAutosave({ username, enabled = true }: UseActaDraftA
         void flush();
       }, delay);
     },
-    [flush, username, enabled]
+    [flush, username, enabled, practice]
   );
 
   /**
@@ -328,9 +379,17 @@ export function useActaDraftAutosave({ username, enabled = true }: UseActaDraftA
   }, [username]);
 
   const finalize = useCallback(
-    async (snapshot: ActaDraftSnapshot): Promise<ActaResponse> => {
+    async (snapshot: ActaDraftSnapshot): Promise<ActaResponse | ActaPracticaResponse> => {
       setFinalizing(true);
       try {
+        if (practice) {
+          const simulada = await actaApi.crearActaPractica(snapshotToCreateRequest(snapshot));
+          latestSnapshotRef.current = null;
+          setInitialSnapshot(null);
+          clearLocalSnapshot(username);
+          return simulada;
+        }
+
         if (debounceTimerRef.current) {
           clearTimeout(debounceTimerRef.current);
           debounceTimerRef.current = null;
@@ -388,7 +447,7 @@ export function useActaDraftAutosave({ username, enabled = true }: UseActaDraftA
         setFinalizing(false);
       }
     },
-    [markDraftGone, username]
+    [markDraftGone, username, practice]
   );
 
   return {

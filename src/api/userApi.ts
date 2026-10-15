@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import type {
   CreateUserRequest,
+  SelfProfileUpdateRequest,
   ResetPasswordRequest,
   ResetPasswordResponse,
   RoleDto,
@@ -18,6 +19,16 @@ import type { BulkImportResult } from "@/types/bulkImport";
 export const userApi = {
   getUsuarios: async (): Promise<UserDto[]> => {
     const { data } = await apiClient.get<UserDto[]>("/usuarios");
+    return data;
+  },
+  /** Perfil propio, resuelto desde el JWT (no requiere USER_MANAGE). */
+  getMe: async (): Promise<UserDto> => {
+    const { data } = await apiClient.get<UserDto>("/usuarios/me");
+    return data;
+  },
+  /** Autoservicio: solo correo y telefono. */
+  updateMe: async (body: SelfProfileUpdateRequest): Promise<UserDto> => {
+    const { data } = await apiClient.patch<UserDto>("/usuarios/me", body);
     return data;
   },
   getUsuario: async (id: number): Promise<UserDto> => {

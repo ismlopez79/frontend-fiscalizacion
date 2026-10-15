@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Chip, Collapse, IconButton, MenuItem, Paper, Stack, TextField, Tooltip, Typography } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, MenuItem, Stack, TextField, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -9,6 +8,10 @@ import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
 import { serviceCenterApi } from "@/api/electoralApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
+import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useActiveElectoralPeriod } from "@/hooks/useActiveElectoralPeriod";
 import { BulkImportDialog } from "@/components/BulkImportDialog";
@@ -57,8 +60,8 @@ export function CentrosServicioPage() {
 
   const columns: GridColDef<ServiceCenterDto>[] = useMemo(
     () => [
-      { field: "code", headerName: "Código", width: 110 },
-      { field: "name", headerName: "Nombre", flex: 1, minWidth: 220 },
+      { field: "code", headerName: "Código", cellClassName: "cell-code", width: 110 },
+      { field: "name", headerName: "Nombre", cellClassName: "cell-strong", flex: 1, minWidth: 220 },
       { field: "departmentName", headerName: "Departamento", width: 160 },
       {
         field: "address",
@@ -114,80 +117,77 @@ export function CentrosServicioPage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Centros de servicio</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Centros tipo JRV habilitados durante un período electoral, donde fiscalizan los
-            delegados temporales.
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5}>
-          <Tooltip title={periodFilter ? "" : "Selecciona un período electoral para la carga masiva"}>
-            <span>
-              <Button
-                variant="outlined"
-                startIcon={<UploadFileIcon />}
-                disabled={!periodFilter}
-                onClick={() => setBulkImportOpen(true)}
-              >
-                Carga masiva
-              </Button>
-            </span>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            disabled={!periodFilter}
-            onClick={() => setDialog({ type: "create" })}
-          >
-            Nuevo centro
-          </Button>
-        </Stack>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Centros de servicio"
+        subtitle="Centros tipo JRV habilitados durante un período electoral, donde fiscalizan los delegados temporales."
+        actions={
+          <>
+            <Tooltip title={periodFilter ? "" : "Selecciona un período electoral para la carga masiva"}>
+              <span>
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileIcon />}
+                  disabled={!periodFilter}
+                  onClick={() => setBulkImportOpen(true)}
+                >
+                  Carga masiva
+                </Button>
+              </span>
+            </Tooltip>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              disabled={!periodFilter}
+              onClick={() => setDialog({ type: "create" })}
+            >
+              Nuevo centro
+            </Button>
+          </>
+        }
+      />
 
-      <TextField
-        select
-        label="Período electoral"
-        size="small"
-        sx={{ maxWidth: 320 }}
-        value={periodFilter}
-        onChange={(e) => setPeriodFilter(e.target.value === "" ? "" : Number(e.target.value))}
-      >
-        <MenuItem value="" disabled>
-          Selecciona un período
-        </MenuItem>
-        {(periodos ?? []).map((p) => (
-          <MenuItem key={p.id} value={p.id}>
-            {p.name} {p.active ? "· activo" : ""}
+      <FloatingToolbar>
+        <TextField
+          select
+          label="Período electoral"
+          size="small"
+          sx={{ minWidth: 260 }}
+          value={periodFilter}
+          onChange={(e) => setPeriodFilter(e.target.value === "" ? "" : Number(e.target.value))}
+        >
+          <MenuItem value="" disabled>
+            Selecciona un período
           </MenuItem>
-        ))}
-      </TextField>
+          {(periodos ?? []).map((p) => (
+            <MenuItem key={p.id} value={p.id}>
+              {p.name} {p.active ? "· activo" : ""}
+            </MenuItem>
+          ))}
+        </TextField>
+      </FloatingToolbar>
 
       {!periodFilter && (
-        <Alert severity="info">Selecciona un período electoral para ver o crear sus centros de servicio.</Alert>
+        <Callout tone="info">Selecciona un período electoral para ver o crear sus centros de servicio.</Callout>
       )}
 
       <Collapse in={centrosQuery.isError}>
-        <Alert severity="error">{getApiErrorMessage(centrosQuery.error, "No se pudo cargar el catálogo.")}</Alert>
+        <Callout tone="error" title="No se pudo cargar el catálogo">
+          {getApiErrorMessage(centrosQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
-      <Paper variant="outlined" sx={{ height: 520 }}>
-        <DataGrid
+      <DataTable
           rows={centrosQuery.data ?? []}
           columns={columns}
           loading={centrosQuery.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
             sorting: { sortModel: [{ field: "name", sort: "asc" }] },
           }}
           pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
+          empty={{ title: "Aún no hay centros en este período" }}
         />
-      </Paper>
 
       <CentroServicioFormDialog
         open={dialog.type === "create" || dialog.type === "edit"}

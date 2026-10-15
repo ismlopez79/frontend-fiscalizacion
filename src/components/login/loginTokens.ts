@@ -28,23 +28,27 @@ export const loginTokens = {
  */
 export const loginInputSx = {
   height: 54,
-  borderRadius: "12px",
-  backgroundColor: "#FFFFFF",
+  borderRadius: "14px",
+  // Campo blanco casi opaco sobre la tarjeta de vidrio: legible sin importar
+  // el color que pase por detras. Sin borde duro en reposo, solo un anillo tenue.
+  backgroundColor: "rgba(255, 255, 255, 0.86)",
   fontSize: 15.5,
-  transition: `box-shadow 150ms ${loginTokens.ease}, border-color 150ms ${loginTokens.ease}`,
+  transition: `box-shadow 150ms ${loginTokens.ease}, background-color 150ms ${loginTokens.ease}`,
   "& fieldset": {
-    borderColor: loginTokens.borderIdle,
-    borderRadius: "12px",
+    borderColor: "rgba(13, 27, 42, 0.08)",
+    borderRadius: "14px",
+    transition: `border-color 150ms ${loginTokens.ease}`,
   },
-  "&:hover fieldset": {
-    borderColor: loginTokens.borderHover,
+  "@media (hover: hover) and (pointer: fine)": {
+    "&:hover fieldset": { borderColor: "rgba(13, 27, 42, 0.18)" },
+  },
+  "&.Mui-focused": {
+    backgroundColor: "#FFFFFF",
+    boxShadow: "0 0 0 4px rgba(27, 58, 107, 0.12)",
   },
   "&.Mui-focused fieldset": {
     borderColor: loginTokens.navy,
     borderWidth: "1.5px",
-  },
-  "&.Mui-focused": {
-    boxShadow: "0 0 0 3px rgba(27, 58, 107, 0.10)",
   },
   "&.Mui-error fieldset": {
     borderColor: loginTokens.error,

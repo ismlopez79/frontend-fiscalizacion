@@ -21,13 +21,14 @@ import {
 } from "@mui/material";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ContentCopyIcon from "@mui/icons-material/ContentCopyOutlined";
 import { userApi } from "@/api/userApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import type { UserDto } from "@/types/user";
 
 const schema = z.object({
-  newPassword: z.union([z.literal(""), z.string().min(8, "Mínimo 8 caracteres")]),
+  newPassword: z.union([z.literal(""), z.string().min(8, "Mínimo 8 caracteres").max(72, "Máximo 72 caracteres")]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -121,7 +122,7 @@ export function ResetPasswordDialog({ open, user, onClose }: ResetPasswordDialog
         <>
           <DialogContent>
             <Stack spacing={2}>
-              <Alert severity="warning" sx={{ borderRadius: "10px" }}>
+              <Alert severity="warning">
                 Cópiala y comunícasela ahora: esta es la única vez que se muestra, no queda
                 guardada en ningún otro lugar del sistema.
               </Alert>
@@ -131,19 +132,33 @@ export function ResetPasswordDialog({ open, user, onClose }: ResetPasswordDialog
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 1,
-                  p: 1.5,
-                  borderRadius: "10px",
-                  border: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: "action.hover",
+                  pl: 2,
+                  pr: 1,
+                  py: 1.5,
+                  borderRadius: "14px",
+                  bgcolor: "rgba(15, 23, 42, 0.04)",
                 }}
               >
-                <Typography sx={{ fontFamily: "monospace", fontSize: 16, wordBreak: "break-all" }}>
+                <Typography
+                  sx={{
+                    fontFamily: '"SF Mono", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace',
+                    fontSize: "1.25rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.04em",
+                    color: "text.primary",
+                    wordBreak: "break-all",
+                    userSelect: "all",
+                  }}
+                >
                   {temporaryPassword}
                 </Typography>
                 <Tooltip title={copied ? "¡Copiada!" : "Copiar contraseña"}>
-                  <IconButton size="small" onClick={copyPassword}>
-                    <ContentCopyIcon fontSize="small" />
+                  <IconButton
+                    onClick={copyPassword}
+                    aria-label="Copiar contraseña"
+                    sx={{ color: copied ? "success.main" : "text.secondary", transition: "color 150ms ease" }}
+                  >
+                    {copied ? <CheckRoundedIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
                   </IconButton>
                 </Tooltip>
               </Box>
@@ -153,7 +168,7 @@ export function ResetPasswordDialog({ open, user, onClose }: ResetPasswordDialog
               </Typography>
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions>
             <Button variant="contained" onClick={handleClose}>
               Cerrar
             </Button>
@@ -210,7 +225,7 @@ export function ResetPasswordDialog({ open, user, onClose }: ResetPasswordDialog
               )}
             />
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions>
             <Button onClick={handleClose} color="inherit">
               Cancelar
             </Button>

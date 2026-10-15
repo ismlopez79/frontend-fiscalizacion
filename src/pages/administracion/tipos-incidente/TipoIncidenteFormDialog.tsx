@@ -22,8 +22,8 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import type { IncidentTypeDto } from "@/types/catalog";
 
 const schema = z.object({
-  code: z.string().min(1, "El código es obligatorio"),
-  name: z.string().min(1, "El nombre es obligatorio"),
+  code: z.string().min(1, "El código es obligatorio").max(50, "Máximo 50 caracteres"),
+  name: z.string().min(1, "El nombre es obligatorio").max(150, "Máximo 150 caracteres"),
   description: z.string().optional(),
   displayOrder: z.number({ invalid_type_error: "Debe ser un número" }).int().min(0, "Debe ser 0 o mayor"),
   active: z.boolean(),
@@ -150,7 +150,7 @@ export function TipoIncidenteFormDialog({ open, tipoIncidente, onClose }: TipoIn
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

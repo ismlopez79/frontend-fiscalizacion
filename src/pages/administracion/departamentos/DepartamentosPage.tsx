@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Chip, Collapse, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, Stack, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -9,6 +8,9 @@ import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
 import { catalogApi } from "@/api/catalogApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { BulkImportDialog } from "@/components/BulkImportDialog";
 import type { DepartmentDto } from "@/types/catalog";
@@ -45,8 +47,8 @@ export function DepartamentosPage() {
 
   const columns: GridColDef<DepartmentDto>[] = useMemo(
     () => [
-      { field: "code", headerName: "Código", width: 120 },
-      { field: "name", headerName: "Nombre", flex: 1, minWidth: 200 },
+      { field: "code", headerName: "Código", cellClassName: "cell-code", width: 120 },
+      { field: "name", headerName: "Nombre", cellClassName: "cell-strong", flex: 1, minWidth: 200 },
       {
         field: "active",
         headerName: "Estado",
@@ -94,44 +96,39 @@ export function DepartamentosPage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Departamentos</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Catálogo de departamentos del país. Desactivar no borra el histórico de actas ya
-            registradas con ese departamento.
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5}>
-          <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setBulkImportOpen(true)}>
-            Carga masiva
-          </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
-            Nuevo departamento
-          </Button>
-        </Stack>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Departamentos"
+        subtitle="Catálogo de departamentos del país. Desactivar no borra el histórico de actas ya registradas con ese departamento."
+        actions={
+          <>
+            <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setBulkImportOpen(true)}>
+              Carga masiva
+            </Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
+              Nuevo departamento
+            </Button>
+          </>
+        }
+      />
 
       <Collapse in={query.isError}>
-        <Alert severity="error">{getApiErrorMessage(query.error, "No se pudo cargar el catálogo.")}</Alert>
+        <Callout tone="error" title="No se pudo cargar el catálogo">
+          {getApiErrorMessage(query.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
-      <Paper variant="outlined" sx={{ height: 520 }}>
-        <DataGrid
+      <DataTable
           rows={query.data ?? []}
           columns={columns}
           loading={query.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
             sorting: { sortModel: [{ field: "name", sort: "asc" }] },
           }}
           pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
+          empty={{ title: "Aún no hay departamentos", hint: "Usa el botón de arriba para agregar el primero." }}
         />
-      </Paper>
 
       <DepartamentoFormDialog
         open={dialog.type === "create" || dialog.type === "edit"}

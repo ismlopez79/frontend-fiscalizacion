@@ -1,4 +1,5 @@
 import { createTheme, responsiveFontSizes } from "@mui/material/styles";
+import type {} from "@mui/x-data-grid/themeAugmentation";
 import "@fontsource/plus-jakarta-sans/400.css";
 import "@fontsource/plus-jakarta-sans/500.css";
 import "@fontsource/plus-jakarta-sans/600.css";
@@ -49,7 +50,7 @@ export const designTokens = {
   canvasBg: "#F4F5F7",
   cardBg: "#FFFFFF",
   cardBorder: "#E7E9EE",
-  cardShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+  cardShadow: "0 0 0 1px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px -16px rgba(15, 23, 42, 0.10)",
   cardRadiusSm: 11,
   cardRadiusLg: 16,
   accent: "#2563EB",
@@ -124,6 +125,39 @@ const baseTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        html: {
+          // Sin el destello gris/azul del navegador al tocar: cada control ya tiene su propio :active.
+          WebkitTapHighlightColor: "transparent",
+          WebkitTextSizeAdjust: "100%",
+        },
+        // Sin retraso de 300ms en el toque y sin seleccionar el texto del boton con una pulsacion larga.
+        "button, a, [role='button'], [role='radio'], .MuiButtonBase-root": {
+          touchAction: "manipulation",
+        },
+        "button, [role='button'], [role='radio'], .MuiButtonBase-root": {
+          userSelect: "none",
+          WebkitUserSelect: "none",
+        },
+        // iOS/iPadOS hace zoom al enfocar un input con letra menor a 16px y no
+        // regresa: la barra superior queda fuera de la vista hasta que el usuario
+        // aleja el zoom a mano. Dos condiciones, porque un iPad con teclado o
+        // trackpad se reporta como puntero "fino" y no entra en la primera:
+        //  - pantallas tactiles en general (Android, tablets);
+        //  - cualquier Safari de iOS/iPadOS (-webkit-touch-callout solo existe ahi),
+        //    tenga o no teclado/trackpad conectado.
+        // En escritorio se conserva el tamaño compacto. Nunca se bloquea el zoom.
+        "@media (pointer: coarse), (hover: none)": {
+          "input, textarea, select, .MuiInputBase-input": { fontSize: "16px !important" },
+        },
+        "@supports (-webkit-touch-callout: none)": {
+          "input, textarea, select, .MuiInputBase-input": { fontSize: "16px !important" },
+        },
+        // El <input> interno no dibuja su propio anillo: el campo (OutlinedInput) ya
+        // muestra el suyo alrededor; si no, se veian dos anillos anidados al enfocar.
+        "input:focus-visible, textarea:focus-visible, select:focus-visible": {
+          boxShadow: "none !important",
+          outline: "none",
+        },
         "*:focus-visible": {
           outline: "none",
           boxShadow: designTokens.focusRing,
@@ -136,10 +170,12 @@ const baseTheme = createTheme({
         root: {
           backgroundImage: "none",
         },
+        // Superficie del sistema (misma que el dashboard): sin borde duro,
+        // radio amplio y sombra de contacto + ambiente apenas perceptible.
         outlined: {
-          border: `1px solid ${designTokens.cardBorder}`,
+          border: "none",
           boxShadow: designTokens.cardShadow,
-          borderRadius: designTokens.cardRadiusLg,
+          borderRadius: 20,
         },
       },
     },
@@ -162,7 +198,9 @@ const baseTheme = createTheme({
       styleOverrides: {
         root: ({ theme }) => ({
           borderRadius: 10,
-          transition: designTokens.transitionFast,
+          transition: `background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms ${designTokens.easeOut}`,
+          // Respuesta al presionar: la interfaz confirma que escucho el toque.
+          "&:active:not(.Mui-disabled)": { transform: "scale(0.97)" },
           [theme.breakpoints.down("lg")]: {
             minHeight: 44,
           },
@@ -188,11 +226,65 @@ const baseTheme = createTheme({
         },
       },
     },
+    // Pastillas: fondo tintado del tono, sin borde. "outlined" deja de ser un
+    // contorno y pasa a ser la version neutra/suave del mismo tono, asi un
+    // Activo/Inactivo/Bloqueada se lee igual en toda la app.
     MuiChip: {
       styleOverrides: {
         root: {
           fontWeight: 700,
           fontSize: "0.75rem",
+          borderRadius: 999,
+          height: 24,
+          "&.MuiChip-outlined": { border: "none" },
+          "&.MuiChip-colorDefault": { backgroundColor: designTokens.status.neutral.bg, color: designTokens.status.neutral.fg },
+          "&.MuiChip-colorPrimary.MuiChip-outlined, &.MuiChip-colorInfo": {
+            backgroundColor: designTokens.accentSoft,
+            color: palette.primary.dark,
+          },
+          "&.MuiChip-colorSuccess": { backgroundColor: designTokens.status.success.bg, color: designTokens.status.success.fg },
+          "&.MuiChip-colorWarning": { backgroundColor: designTokens.status.warning.bg, color: designTokens.status.warning.fg },
+          "&.MuiChip-colorError": { backgroundColor: designTokens.status.error.bg, color: designTokens.status.error.fg },
+          "& .MuiChip-icon": { color: "inherit", fontSize: 15, marginLeft: 7, marginRight: -3 },
+        },
+        sizeSmall: { height: 24 },
+        label: { paddingLeft: 9, paddingRight: 9 },
+      },
+    },
+    // Switch estilo iOS: pista redondeada que se tiñe al activarse y perilla
+    // blanca con sombra; el recorrido usa la curva fuerte del sistema.
+    MuiSwitch: {
+      styleOverrides: {
+        root: {
+          width: 46,
+          height: 28,
+          padding: 0,
+          margin: "0 10px 0 8px",
+        },
+        switchBase: {
+          padding: 3,
+          transitionProperty: "transform",
+          transitionDuration: "220ms",
+          transitionTimingFunction: designTokens.easeOut,
+          "&.Mui-checked": {
+            transform: "translateX(18px)",
+            color: "#FFFFFF",
+            "& + .MuiSwitch-track": { backgroundColor: designTokens.status.success.fg, opacity: 1 },
+          },
+          "&.Mui-disabled + .MuiSwitch-track": { opacity: 0.4 },
+          "&.Mui-focusVisible .MuiSwitch-thumb": { boxShadow: designTokens.focusRing },
+        },
+        thumb: {
+          width: 22,
+          height: 22,
+          boxShadow: "0 2px 4px rgba(15, 23, 42, 0.2), 0 0 0 0.5px rgba(15, 23, 42, 0.04)",
+          color: "#FFFFFF",
+        },
+        track: {
+          borderRadius: 14,
+          backgroundColor: "rgba(15, 23, 42, 0.16)",
+          opacity: 1,
+          transition: "background-color 220ms ease",
         },
       },
     },
@@ -226,10 +318,136 @@ const baseTheme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: ({ theme }) => ({
+          transition: `background-color 150ms ease, color 150ms ease, transform 160ms ${designTokens.easeOut}`,
+          "&:active:not(.Mui-disabled)": { transform: "scale(0.92)" },
           [theme.breakpoints.down("md")]: {
             padding: 10,
           },
         }),
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: 20,
+          boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.06), 0 24px 64px -16px rgba(15, 23, 42, 0.30)",
+        },
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: { fontSize: "1.125rem", fontWeight: 700, letterSpacing: "-0.015em", padding: "22px 24px 8px" },
+      },
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: { padding: "8px 24px 16px", "& > .MuiStack-root:first-of-type": { paddingTop: 8 } },
+      },
+    },
+    // Pie del dialogo separado por una linea tenue; en movil los botones ocupan el ancho.
+    MuiDialogActions: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          padding: "14px 24px 20px",
+          gap: 8,
+          borderTop: "1px solid rgba(15, 23, 42, 0.06)",
+          "& > :not(style) ~ :not(style)": { marginLeft: 0 },
+          [theme.breakpoints.down("sm")]: {
+            flexDirection: "column-reverse",
+            alignItems: "stretch",
+          },
+        }),
+      },
+    },
+    // Fondo de modales: solo atenuado, sin blur — el blur de pantalla
+    // completa se paga en cada frame y es lo primero que baja el rendimiento.
+    MuiBackdrop: {
+      styleOverrides: {
+        root: {
+          "&:not(.MuiBackdrop-invisible)": { backgroundColor: "rgba(15, 23, 42, 0.36)" },
+        },
+      },
+    },
+    // Menus, selects y popovers: piezas chicas que flotan -> vidrio (barato a este tamaño).
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          borderRadius: 14,
+          backgroundColor: "rgba(255, 255, 255, 0.86)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          border: "1px solid rgba(255, 255, 255, 0.8)",
+          boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.06), 0 16px 40px -12px rgba(15, 23, 42, 0.25)",
+          "@media (prefers-reduced-transparency: reduce)": {
+            backgroundColor: "#FFFFFF",
+            backdropFilter: "none",
+          },
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          marginLeft: 6,
+          marginRight: 6,
+          fontSize: "0.875rem",
+        },
+      },
+    },
+    MuiTooltip: {
+      styleOverrides: {
+        tooltip: {
+          backgroundColor: "rgba(15, 23, 42, 0.88)",
+          borderRadius: 8,
+          fontSize: "0.75rem",
+          fontWeight: 500,
+          padding: "6px 10px",
+          boxShadow: "0 8px 24px -8px rgba(15, 23, 42, 0.35)",
+        },
+      },
+    },
+    MuiAlert: {
+      styleOverrides: {
+        root: { borderRadius: 14, alignItems: "flex-start" },
+        standardInfo: { backgroundColor: designTokens.accentSoft },
+      },
+    },
+    MuiSkeleton: {
+      styleOverrides: {
+        root: { backgroundColor: "rgba(15, 23, 42, 0.06)" },
+      },
+    },
+    // Tablas: sin marco ni separadores de columna; encabezado discreto,
+    // filas con hover tenue. La tabla vive dentro de una superficie.
+    MuiDataGrid: {
+      styleOverrides: {
+        root: {
+          border: "none",
+          fontSize: "0.8125rem",
+          "--DataGrid-rowBorderColor": "rgba(15, 23, 42, 0.06)",
+          "--DataGrid-containerBackground": "transparent",
+          "& .MuiDataGrid-columnHeaders": { borderBottom: "1px solid rgba(15, 23, 42, 0.08)" },
+          "& .MuiDataGrid-columnHeaderTitle": {
+            fontWeight: 600,
+            fontSize: "0.75rem",
+            color: designTokens.textCaption,
+          },
+          "& .MuiDataGrid-columnSeparator": { display: "none" },
+          "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within, & .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within":
+            { outline: "none" },
+          "& .MuiDataGrid-cell:focus-visible": { outline: `2px solid ${palette.primary.main}`, outlineOffset: -2 },
+          "& .MuiDataGrid-row": { transition: "background-color 120ms ease" },
+          // Hover solo con mouse: en touch el :hover se queda "pegado" tras tocar una fila.
+          "@media (hover: hover) and (pointer: fine)": {
+            "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(15, 23, 42, 0.025)" },
+          },
+          "@media (hover: none)": {
+            "& .MuiDataGrid-row:hover": { backgroundColor: "transparent" },
+          },
+          "& .MuiDataGrid-footerContainer": { borderTop: "1px solid rgba(15, 23, 42, 0.06)" },
+          "& .MuiDataGrid-overlay": { backgroundColor: "rgba(255, 255, 255, 0.6)" },
+        },
       },
     },
     MuiTableRow: {

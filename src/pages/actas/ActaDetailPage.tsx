@@ -1,25 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import {
-  Alert,
   Box,
   Button,
-  Chip,
+  ButtonBase,
   CircularProgress,
   Dialog,
   DialogContent,
-  DialogTitle,
   Divider,
+  Grid,
   IconButton,
-  Paper,
+  Skeleton,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -28,24 +22,33 @@ import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import SendIcon from "@mui/icons-material/SendOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ReplayIcon from "@mui/icons-material/ReplayOutlined";
-import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import { actaApi } from "@/api/actaApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { downloadBlob } from "@/utils/downloadBlob";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsTemporaryDelegate } from "@/hooks/useMyAccount";
 import { EstadoActaChip } from "@/components/EstadoActaChip";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
-import { numericDataSx } from "@/theme/theme";
+import { designTokens } from "@/theme/theme";
 import { useToast } from "@/hooks/useToast";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
-import type { ActaFileDto } from "@/types/acta";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionHeader, Surface } from "@/components/ui/Surface";
+import { Callout } from "@/components/ui/Callout";
+import { DetailRow } from "@/components/ui/DetailRow";
+import type { ActaFileDto, ProduccionResponse } from "@/types/acta";
+import { AcompanantesList, actaNumberFormatter as fmt, formatActaDate, formatActaDateTime, formatTime } from "./actaUi";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "application/pdf"];
@@ -54,10 +57,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDateTime(value: string): string {
-  return dayjs(value).format("DD/MM/YYYY HH:mm");
 }
 
 export function ActaDetailPage() {
@@ -73,6 +72,7 @@ export function ActaDetailPage() {
     "enviar-revision" | "reanudar" | "aprobar" | "observar" | "rechazar" | "anular" | null
   >(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [previewLoadingId, setPreviewLoadingId] = useState<number | null>(null);
   const [previewFile, setPreviewFile] = useState<{ file: ActaFileDto; url: string } | null>(null);
   const [fileToDelete, setFileToDelete] = useState<ActaFileDto | null>(null);
@@ -99,7 +99,11 @@ export function ActaDetailPage() {
   });
 
   const acta = actaQuery.data;
-  const isOwner = !!acta && acta.createdByUsername === user?.username;
+  // Dueño = mismo username Y mismo tipo de cuenta: permanentes y temporales
+  // viven en tablas distintas y podrian compartir username.
+  const isTemporary = useIsTemporaryDelegate();
+  const isOwner =
+    !!acta && acta.createdByUsername === user?.username && (acta.createdByType === "TEMPORARY") === isTemporary;
   const isAdmin = !!user?.roles.includes("ADMINISTRADOR");
   const isReviewer = isAdmin || !!user?.roles.includes("SUPERVISOR");
   const canAct = isOwner || isAdmin;
@@ -207,6 +211,19 @@ export function ActaDetailPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  /** Se genera al vuelo en el backend (no queda guardado en el servidor); solo disponible fuera de BORRADOR. */
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const blob = await actaApi.descargarPdf(actaId);
+      downloadBlob(blob, `Acta-${acta?.actaNumber ?? actaId}.pdf`);
+    } catch (error) {
+      showToast("error", getApiErrorMessage(error, "No se pudo generar el PDF del acta."));
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const handleDownload = async (fileId: number, originalName: string) => {
     setDownloadingId(fileId);
     try {
@@ -242,369 +259,462 @@ export function ActaDetailPage() {
   // limpia solo cuando previewFile cambia (incluido este caso, a null).
   const closePreview = () => setPreviewFile(null);
 
+  const backButton = (
+    <Button size="small" color="inherit" startIcon={<ArrowBackIcon />} onClick={() => navigate("/actas")}>
+      Actas
+    </Button>
+  );
+
   if (actaQuery.isLoading) {
-    return (
-      <Stack alignItems="center" sx={{ py: 8 }}>
-        <CircularProgress />
-      </Stack>
-    );
+    return <DetailSkeleton back={backButton} />;
   }
 
   if (actaQuery.isError || !acta) {
     return (
-      <Alert severity="error">
-        {getApiErrorMessage(actaQuery.error, "No se pudo cargar el acta.")}
-      </Alert>
+      <Stack spacing={2} sx={{ flexShrink: 0 }}>
+        <Box sx={{ ml: -1 }}>{backButton}</Box>
+        <Callout tone="error" title="No se pudo cargar el acta">
+          {getApiErrorMessage(actaQuery.error, "Puede que ya no exista o que no tengas acceso a ella.")}
+        </Callout>
+      </Stack>
     );
   }
 
   const canSendToReview = canAct && (acta.status === "REGISTRADA" || acta.status === "OBSERVADA");
   const canResume = canAct && acta.status === "OBSERVADA";
+  // PUT /actas/{id}: el dueño (o el administrador) corrige los datos mientras
+  // el acta siga en REGISTRADA u OBSERVADA.
+  const canEdit = canAct && (acta.status === "REGISTRADA" || acta.status === "OBSERVADA");
   const canUploadFiles = canAct && (acta.status === "REGISTRADA" || acta.status === "OBSERVADA");
   // El backend exige al menos un archivo adjunto para poder enviar a
   // revision (409 BUSINESS_RULE_VIOLATION si no). Mientras la lista de
   // archivos no termina de cargar, tratamos "sin archivos" por defecto —
   // mejor un boton deshabilitado de mas un instante que dejar pasar el
   // click y chocar con el 409.
-  const hasFiles = (archivosQuery.data ?? []).length > 0;
+  const archivos = archivosQuery.data ?? [];
+  const hasFiles = archivos.length > 0;
   const sendToReviewBlockedByFiles = canSendToReview && (archivosQuery.isLoading || !hasFiles);
   const canApprove = isReviewer && acta.status === "PENDIENTE_REVISION";
   const canObservar = isReviewer && acta.status === "PENDIENTE_REVISION";
   const canRechazar = isReviewer && acta.status === "PENDIENTE_REVISION";
   const canAnular = isAdmin && acta.status !== "ANULADA";
+  const canDownloadPdf = acta.status !== "BORRADOR";
+
+  const arrival = formatTime(acta.arrivalTime);
+  const departure = formatTime(acta.departureTime);
 
   return (
-    <Stack spacing={2.5}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => navigate("/actas")}
-        sx={{ alignSelf: "flex-start" }}
-        color="inherit"
-      >
-        Volver a mis actas
-      </Button>
-
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Typography variant="h3">{acta.actaNumber}</Typography>
-          <EstadoActaChip estado={acta.status} />
-        </Stack>
-
-        <Stack direction="row" spacing={1.5} flexWrap="wrap" rowGap={1}>
-          {canResume && (
-            <Button
-              variant="outlined"
-              startIcon={<ReplayIcon />}
-              onClick={() => setConfirmAction("reanudar")}
-              disabled={reanudarMutation.isPending}
-            >
-              Reanudar para corregir
-            </Button>
-          )}
-          {canSendToReview && (
-            <Tooltip
-              title={
-                sendToReviewBlockedByFiles
-                  ? "Adjunta al menos una foto o PDF del acta antes de enviarla a revisión."
-                  : ""
-              }
-            >
-              <span>
-                <Button
-                  variant="contained"
-                  startIcon={<SendIcon />}
-                  onClick={() => setConfirmAction("enviar-revision")}
-                  disabled={enviarRevisionMutation.isPending || sendToReviewBlockedByFiles}
-                >
-                  Enviar a revisión
-                </Button>
-              </span>
-            </Tooltip>
-          )}
-          {canRechazar && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<CancelOutlinedIcon />}
-              onClick={() => setConfirmAction("rechazar")}
-              disabled={rechazarMutation.isPending}
-            >
-              Rechazar
-            </Button>
-          )}
-          {canObservar && (
-            <Button
-              variant="outlined"
-              color="warning"
-              startIcon={<FlagOutlinedIcon />}
-              onClick={() => setConfirmAction("observar")}
-              disabled={observarMutation.isPending}
-            >
-              Observar
-            </Button>
-          )}
-          {canApprove && (
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircleOutlineRoundedIcon />}
-              onClick={() => setConfirmAction("aprobar")}
-              disabled={aprobarMutation.isPending}
-            >
-              Aprobar
-            </Button>
-          )}
-          {canAnular && (
-            <Button
-              variant="text"
-              color="error"
-              startIcon={<BlockOutlinedIcon />}
-              onClick={() => setConfirmAction("anular")}
-              disabled={anularMutation.isPending}
-            >
-              Anular
-            </Button>
-          )}
-        </Stack>
-      </Stack>
-
-      {acta.status === "OBSERVADA" && (
-        <Alert severity="info">
-          Esta acta fue observada por el revisor. El motivo todavía no viaja en esta pantalla —
-          consulta con el revisor por fuera del sistema qué hay que corregir antes de reanudarla.
-        </Alert>
-      )}
-
-      {acta.hasDiscrepancy && (
-        <Alert severity="warning">
-          El total declarado ({acta.declaredTotal ?? "—"}) no coincide con el total calculado (
-          {acta.calculatedTotal}).
-        </Alert>
-      )}
-      {acta.possibleDuplicate && (
-        <Alert severity="warning">Este acta podría ser un duplicado de otra ya registrada.</Alert>
-      )}
-
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack spacing={1.5}>
-          <Typography variant="h4">Identificación</Typography>
-          <Stack direction="row" flexWrap="wrap" columnGap={4} rowGap={1.5}>
-            <InfoField label="Departamento" value={acta.departmentName} />
-            <InfoField label="Duicentro" value={acta.duicentroName} />
-            <InfoField label="Fecha del acta" value={acta.actaDate} />
-            <InfoField label="Hora de llegada" value={acta.arrivalTime ?? "—"} />
-            <InfoField label="Hora de salida" value={acta.departureTime ?? "—"} />
-            <InfoField label="Creada por" value={acta.createdByUsername} />
-            <InfoField label="Creada el" value={formatDateTime(acta.createdAt)} />
-            <InfoField label="Última actualización" value={formatDateTime(acta.updatedAt)} />
-          </Stack>
-          <Divider />
-          <Stack direction="row" flexWrap="wrap" columnGap={4} rowGap={1.5}>
-            <InfoField label="Delegado JVE" value={acta.jveDelegateName ?? "—"} />
-            <InfoField label="Delegado RNPN" value={acta.rnpnDelegateName ?? "—"} />
-            <InfoField label="Jefe de duicentro" value={acta.duicentroChiefName ?? "—"} />
-          </Stack>
-          {acta.observations && (
-            <>
-              <Divider />
-              <InfoField label="Observaciones" value={acta.observations} />
-            </>
-          )}
-          <Divider />
-          <Stack direction="row" flexWrap="wrap" columnGap={4} rowGap={1.5}>
-            <InfoField label="Total declarado" value={acta.declaredTotal ?? "—"} numeric />
-            <InfoField label="Total calculado" value={acta.calculatedTotal} numeric />
-          </Stack>
-        </Stack>
-      </Paper>
-
-      <Stack spacing={2}>
-        <Typography variant="h4">Producciones</Typography>
-        {acta.producciones.map((p) => (
-          <Paper key={p.id} variant="outlined" sx={{ p: 2.5 }}>
-            <Stack spacing={1.5}>
-              <Stack direction="row" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-                <Typography variant="subtitle1" fontWeight={600}>
-                  {p.productionDate}
-                </Typography>
-                <Stack direction="row" spacing={2}>
-                  <Typography variant="body2" color="text.secondary">
-                    Declarado: <Box component="span" sx={numericDataSx}>{p.declaredTotal ?? "—"}</Box>
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Calculado: <Box component="span" sx={numericDataSx}>{p.calculatedTotal}</Box>
-                  </Typography>
-                  {p.hasDiscrepancy && <Chip size="small" label="Discrepancia" color="warning" />}
-                </Stack>
-              </Stack>
-
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Categoría</TableCell>
-                    <TableCell align="right">Cantidad</TableCell>
-                    <TableCell>Verificación</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {p.values.map((v) => (
-                    <TableRow key={v.id}>
-                      <TableCell>{v.categoryName}</TableCell>
-                      <TableCell align="right" sx={numericDataSx}>
-                        {v.quantity}
-                      </TableCell>
-                      <TableCell>
-                        {v.needsVerification ? (
-                          <Chip size="small" label="Necesita verificación" color="warning" variant="outlined" />
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {p.observations && (
-                <Typography variant="body2" color="text.secondary">
-                  {p.observations}
-                </Typography>
-              )}
-            </Stack>
-          </Paper>
-        ))}
-      </Stack>
-
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack spacing={1.5}>
-          <Typography variant="h4">Incidentes reportados</Typography>
-          {acta.incidentes.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              Sin incidentes reportados.
-            </Typography>
-          ) : (
-            <Stack spacing={1}>
-              {acta.incidentes.map((incidente) => (
-                <Box
-                  key={incidente.id}
-                  sx={{ py: 0.75, px: 1, border: "1px solid", borderColor: "divider", borderRadius: 1 }}
-                >
-                  <Typography variant="body2" fontWeight={600}>
-                    {incidente.incidentTypeName}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {incidente.description}
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </Stack>
-      </Paper>
-
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack spacing={2}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" rowGap={1}>
-            <Typography variant="h4">Archivos adjuntos</Typography>
-            {canUploadFiles && (
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        back={backButton}
+        title={<Box component="span" sx={{ fontVariantNumeric: "tabular-nums" }}>{acta.actaNumber}</Box>}
+        titleAdornment={<EstadoActaChip estado={acta.status} size="medium" />}
+        subtitle={`${acta.duicentroName} · ${acta.departmentName} · ${formatActaDate(acta.actaDate)}`}
+        actions={
+          <>
+            {canAnular && (
               <Button
-                size="small"
-                component="label"
-                startIcon={<UploadFileIcon />}
-                disabled={uploadMutation.isPending}
+                color="error"
+                startIcon={<BlockOutlinedIcon />}
+                onClick={() => setConfirmAction("anular")}
+                disabled={anularMutation.isPending}
               >
-                {uploadMutation.isPending ? "Subiendo…" : "Adjuntar foto o PDF"}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  hidden
-                  accept="image/jpeg,image/png,application/pdf"
-                  onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
-                />
+                Anular
               </Button>
             )}
-          </Stack>
+            {canDownloadPdf && (
+              <Button
+                variant="outlined"
+                color="inherit"
+                startIcon={downloadingPdf ? <CircularProgress size={16} color="inherit" /> : <PictureAsPdfOutlinedIcon />}
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+              >
+                {downloadingPdf ? "Generando…" : "Descargar PDF"}
+              </Button>
+            )}
+            {canEdit && (
+              <Button variant="outlined" startIcon={<EditOutlinedIcon />} onClick={() => navigate(`/actas/${actaId}/editar`)}>
+                Corregir
+              </Button>
+            )}
+            {canResume && (
+              <Button
+                variant="outlined"
+                startIcon={<ReplayIcon />}
+                onClick={() => setConfirmAction("reanudar")}
+                disabled={reanudarMutation.isPending}
+              >
+                Reanudar para corregir
+              </Button>
+            )}
+            {canSendToReview && (
+              <Tooltip
+                title={
+                  sendToReviewBlockedByFiles
+                    ? "Adjunta al menos una foto o PDF del acta antes de enviarla a revisión."
+                    : ""
+                }
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    startIcon={<SendIcon />}
+                    onClick={() => setConfirmAction("enviar-revision")}
+                    disabled={enviarRevisionMutation.isPending || sendToReviewBlockedByFiles}
+                  >
+                    Enviar a revisión
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {canRechazar && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<CancelOutlinedIcon />}
+                onClick={() => setConfirmAction("rechazar")}
+                disabled={rechazarMutation.isPending}
+              >
+                Rechazar
+              </Button>
+            )}
+            {canObservar && (
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<FlagOutlinedIcon />}
+                onClick={() => setConfirmAction("observar")}
+                disabled={observarMutation.isPending}
+              >
+                Observar
+              </Button>
+            )}
+            {canApprove && (
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<CheckRoundedIcon />}
+                onClick={() => setConfirmAction("aprobar")}
+                disabled={aprobarMutation.isPending}
+              >
+                Aprobar
+              </Button>
+            )}
+          </>
+        }
+      />
 
-          {canUploadFiles && !archivosQuery.isLoading && !hasFiles && (
-            <Alert severity="warning">
-              Debes adjuntar al menos una foto o PDF del acta física antes de poder enviarla a
-              revisión.
-            </Alert>
+      {(acta.status === "OBSERVADA" || acta.hasDiscrepancy || acta.possibleDuplicate) && (
+        <Stack spacing={1.25}>
+          {acta.status === "OBSERVADA" && (
+            <Callout tone="info" title="El revisor observó esta acta">
+              El motivo todavía no viaja en esta pantalla — consulta con el revisor qué hay que corregir. Usa
+              «Corregir» para cambiar los datos y luego vuelve a enviarla a revisión.
+            </Callout>
           )}
-
-          {archivosQuery.isLoading ? (
-            <CircularProgress size={20} />
-          ) : (archivosQuery.data ?? []).length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              Todavía no hay archivos adjuntos.
-            </Typography>
-          ) : (
-            <Stack spacing={1}>
-              {(archivosQuery.data ?? []).map((file) => (
-                <Stack
-                  key={file.id}
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{ py: 0.75, px: 1, border: "1px solid", borderColor: "divider", borderRadius: 1 }}
-                >
-                  <Stack direction="row" alignItems="center" spacing={1.5}>
-                    <InsertDriveFileIcon fontSize="small" color="disabled" />
-                    <Box>
-                      <Typography variant="body2">{file.originalName}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {formatBytes(file.sizeBytes)} · subido por {file.uploadedByUsername}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <Stack direction="row" spacing={0.5}>
-                    <Tooltip title="Ver">
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => handlePreview(file)}
-                          disabled={previewLoadingId === file.id}
-                        >
-                          {previewLoadingId === file.id ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            <VisibilityOutlinedIcon fontSize="small" />
-                          )}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="Descargar">
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDownload(file.id, file.originalName)}
-                          disabled={downloadingId === file.id}
-                        >
-                          <DownloadIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    {canUploadFiles && (
-                      <Tooltip title="Eliminar">
-                        <span>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => setFileToDelete(file)}
-                            disabled={deleteArchivoMutation.isPending}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                  </Stack>
-                </Stack>
-              ))}
-            </Stack>
+          {acta.hasDiscrepancy && (
+            <Callout tone="warning" title="Los totales no coinciden">
+              Declarado {acta.declaredTotal === null ? "—" : fmt.format(acta.declaredTotal)} · calculado{" "}
+              {fmt.format(acta.calculatedTotal)}.
+            </Callout>
+          )}
+          {acta.possibleDuplicate && (
+            <Callout tone="warning" title="Posible duplicado">
+              Esta acta podría ser un duplicado de otra ya registrada.
+            </Callout>
           )}
         </Stack>
-      </Paper>
+      )}
+
+      <Grid container spacing={{ xs: 2, md: 2.5 }} alignItems="flex-start">
+        <Grid item xs={12} lg={8}>
+          <Stack spacing={{ xs: 2, md: 2.5 }}>
+            <Surface>
+              <SectionHeader
+                title="Producciones"
+                subtitle={
+                  acta.producciones.length === 1 ? "1 producción registrada." : `${acta.producciones.length} producciones registradas.`
+                }
+              />
+              <Stack divider={<Divider flexItem sx={{ borderColor: "rgba(15, 23, 42, 0.06)" }} />} spacing={2.5}>
+                {acta.producciones.map((p) => (
+                  <ProduccionBlock key={p.id} produccion={p} />
+                ))}
+              </Stack>
+            </Surface>
+
+            <Surface>
+              <SectionHeader title="Incidentes" />
+              {acta.incidentes.length === 0 ? (
+                <Typography variant="body2">Sin incidentes reportados.</Typography>
+              ) : (
+                <Stack spacing={1.25}>
+                  {acta.incidentes.map((incidente) => (
+                    <Stack
+                      key={incidente.id}
+                      direction="row"
+                      gap={1.5}
+                      sx={{ p: 1.5, borderRadius: "14px", bgcolor: "rgba(15, 23, 42, 0.03)" }}
+                    >
+                      <ReportProblemOutlinedIcon sx={{ fontSize: 20, color: designTokens.status.warning.fg, mt: "1px" }} />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
+                          {incidente.incidentTypeName}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.25, whiteSpace: "pre-line" }}>
+                          {incidente.description}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Surface>
+
+            {(acta.acompanantes ?? []).length > 0 && (
+              <Surface>
+                <SectionHeader
+                  title="Delegados temporales acompañantes"
+                  subtitle="Acompañaron al delegado permanente en esta acta."
+                />
+                <AcompanantesList acompanantes={acta.acompanantes} />
+              </Surface>
+            )}
+
+            {acta.observations && (
+              <Surface>
+                <SectionHeader title="Observaciones" />
+                <Typography variant="body1" sx={{ whiteSpace: "pre-line", maxWidth: "70ch" }}>
+                  {acta.observations}
+                </Typography>
+              </Surface>
+            )}
+          </Stack>
+        </Grid>
+
+        <Grid item xs={12} lg={4}>
+          <Stack spacing={{ xs: 2, md: 2.5 }}>
+            <Surface>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Total calculado
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: "2.5rem",
+                  fontWeight: 700,
+                  letterSpacing: "-0.035em",
+                  lineHeight: 1.1,
+                  fontVariantNumeric: "tabular-nums",
+                  color: "text.primary",
+                }}
+              >
+                {fmt.format(acta.calculatedTotal)}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
+                Declarado en papel:{" "}
+                <Box
+                  component="strong"
+                  sx={{ color: acta.hasDiscrepancy ? designTokens.status.warning.fg : "text.primary" }}
+                >
+                  {acta.declaredTotal === null ? "no indicado" : fmt.format(acta.declaredTotal)}
+                </Box>
+              </Typography>
+
+              <Divider sx={{ my: 2.5, borderColor: "rgba(15, 23, 42, 0.06)" }} />
+
+              <Box component="dl" sx={{ m: 0, display: "grid", gap: 1.5 }}>
+                <DetailRow label="Departamento" value={acta.departmentName} />
+                <DetailRow label="Duicentro" value={acta.duicentroName} />
+                <DetailRow label="Fecha" value={formatActaDate(acta.actaDate)} numeric />
+                <DetailRow
+                  label="Horario"
+                  value={arrival || departure ? `${arrival ?? "—"} – ${departure ?? "—"}` : null}
+                  numeric
+                />
+                <DetailRow label="Delegado JVE" value={acta.jveDelegateName} />
+                <DetailRow label="Delegado RNPN" value={acta.rnpnDelegateName} />
+                <DetailRow label="Jefe de duicentro" value={acta.duicentroChiefName} />
+              </Box>
+
+              <Divider sx={{ my: 2.5, borderColor: "rgba(15, 23, 42, 0.06)" }} />
+
+              <Box component="dl" sx={{ m: 0, display: "grid", gap: 1.5 }}>
+                <DetailRow
+                  label="Creada por"
+                  value={
+                    acta.createdByType === "TEMPORARY"
+                      ? `${acta.createdByUsername} · Delegado temporal`
+                      : acta.createdByUsername
+                  }
+                />
+                <DetailRow label="Creada" value={formatActaDateTime(acta.createdAt)} numeric />
+                <DetailRow label="Actualizada" value={formatActaDateTime(acta.updatedAt)} numeric />
+              </Box>
+            </Surface>
+
+            <Surface>
+              <SectionHeader
+                title="Archivos"
+                subtitle={hasFiles ? `${archivos.length} adjunto${archivos.length === 1 ? "" : "s"}.` : undefined}
+              />
+
+              {canUploadFiles && (
+                <ButtonBase
+                  component="label"
+                  disabled={uploadMutation.isPending}
+                  sx={{
+                    width: "100%",
+                    mb: hasFiles ? 2 : 1.5,
+                    py: 2,
+                    px: 2,
+                    gap: 1.25,
+                    justifyContent: "flex-start",
+                    borderRadius: "14px",
+                    border: "1.5px dashed",
+                    borderColor: !hasFiles && !archivosQuery.isLoading ? designTokens.status.warning.border : "rgba(15, 23, 42, 0.14)",
+                    color: "text.primary",
+                    textAlign: "left",
+                    transition: `background-color 150ms ease, border-color 150ms ease, transform 160ms ${designTokens.easeOut}`,
+                    "&:active": { transform: "scale(0.985)" },
+                    "@media (hover: hover) and (pointer: fine)": {
+                      "&:hover": { bgcolor: designTokens.accentSoft, borderColor: designTokens.accent },
+                    },
+                    "&:focus-within": { boxShadow: designTokens.focusRing },
+                  }}
+                >
+                  {uploadMutation.isPending ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    <UploadFileIcon sx={{ color: designTokens.accent }} />
+                  )}
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
+                      {uploadMutation.isPending ? "Subiendo…" : "Adjuntar foto o PDF"}
+                    </Typography>
+                    <Typography variant="caption">JPG, PNG o PDF · máx. 25 MB</Typography>
+                  </Box>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    hidden
+                    accept="image/jpeg,image/png,application/pdf"
+                    onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
+                  />
+                </ButtonBase>
+              )}
+
+              {canUploadFiles && !archivosQuery.isLoading && !hasFiles && (
+                <Typography variant="body2" sx={{ color: designTokens.status.warning.fg, mb: 0.5 }}>
+                  Adjunta al menos una foto o PDF del acta física para poder enviarla a revisión.
+                </Typography>
+              )}
+
+              {archivosQuery.isLoading ? (
+                <Stack spacing={1}>
+                  <Skeleton variant="rounded" height={52} sx={{ borderRadius: "12px" }} />
+                  <Skeleton variant="rounded" height={52} sx={{ borderRadius: "12px" }} />
+                </Stack>
+              ) : !hasFiles ? (
+                !canUploadFiles && <Typography variant="body2">Sin archivos adjuntos.</Typography>
+              ) : (
+                <Stack spacing={0.5}>
+                  {archivos.map((file) => {
+                    const isPdf = file.mimeType === "application/pdf";
+                    return (
+                      <Stack
+                        key={file.id}
+                        direction="row"
+                        alignItems="center"
+                        gap={1.25}
+                        sx={{
+                          py: 1,
+                          px: 1,
+                          mx: -1,
+                          borderRadius: "12px",
+                          transition: "background-color 120ms ease",
+                          "@media (hover: hover) and (pointer: fine)": {
+                            "&:hover": { bgcolor: "rgba(15, 23, 42, 0.03)" },
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: "10px",
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            bgcolor: isPdf ? designTokens.status.error.bg : designTokens.accentSoft,
+                            color: isPdf ? designTokens.status.error.fg : designTokens.accent,
+                          }}
+                        >
+                          {isPdf ? <PictureAsPdfOutlinedIcon fontSize="small" /> : <ImageOutlinedIcon fontSize="small" />}
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" noWrap sx={{ fontWeight: 600, color: "text.primary" }} title={file.originalName}>
+                            {file.originalName}
+                          </Typography>
+                          <Typography variant="caption" noWrap component="div" sx={{ fontWeight: 500 }}>
+                            {formatBytes(file.sizeBytes)} · {file.uploadedByUsername}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" sx={{ flexShrink: 0 }}>
+                          <Tooltip title="Ver">
+                            <span>
+                              <IconButton
+                                size="small"
+                                aria-label={`Ver ${file.originalName}`}
+                                onClick={() => handlePreview(file)}
+                                disabled={previewLoadingId === file.id}
+                              >
+                                {previewLoadingId === file.id ? (
+                                  <CircularProgress size={16} />
+                                ) : (
+                                  <VisibilityOutlinedIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Descargar">
+                            <span>
+                              <IconButton
+                                size="small"
+                                aria-label={`Descargar ${file.originalName}`}
+                                onClick={() => handleDownload(file.id, file.originalName)}
+                                disabled={downloadingId === file.id}
+                              >
+                                <DownloadIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          {canUploadFiles && (
+                            <Tooltip title="Eliminar">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  aria-label={`Eliminar ${file.originalName}`}
+                                  onClick={() => setFileToDelete(file)}
+                                  disabled={deleteArchivoMutation.isPending}
+                                  sx={{ color: designTokens.status.error.fg }}
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Surface>
+          </Stack>
+        </Grid>
+      </Grid>
 
       <ConfirmacionAccion
         open={confirmAction === "enviar-revision"}
@@ -699,17 +809,23 @@ export function ActaDetailPage() {
       <Dialog open={!!previewFile} onClose={closePreview} maxWidth="md" fullWidth>
         {previewFile && (
           <>
-            <DialogTitle
-              sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}
-            >
-              <Typography variant="h4" noWrap>
+            <Stack direction="row" alignItems="center" gap={1.5} sx={{ px: 2.5, py: 1.75 }}>
+              <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 700 }} noWrap title={previewFile.file.originalName}>
                 {previewFile.file.originalName}
               </Typography>
-              <IconButton size="small" onClick={closePreview}>
+              <Button
+                size="small"
+                color="inherit"
+                startIcon={<DownloadIcon />}
+                onClick={() => handleDownload(previewFile.file.id, previewFile.file.originalName)}
+              >
+                Descargar
+              </Button>
+              <IconButton size="small" aria-label="Cerrar vista previa" onClick={closePreview}>
                 <CloseRoundedIcon fontSize="small" />
               </IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ pt: 0 }}>
+            </Stack>
+            <DialogContent sx={{ p: 0, bgcolor: "rgba(15, 23, 42, 0.04)" }}>
               {previewFile.file.mimeType.startsWith("image/") ? (
                 <Box
                   component="img"
@@ -722,20 +838,11 @@ export function ActaDetailPage() {
                   component="iframe"
                   src={previewFile.url}
                   title={previewFile.file.originalName}
-                  sx={{ width: "100%", height: "75vh", border: "none" }}
+                  sx={{ display: "block", width: "100%", height: "75vh", border: "none" }}
                 />
               ) : (
-                <Stack alignItems="center" spacing={2} sx={{ py: 6 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No hay vista previa disponible para este tipo de archivo.
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    startIcon={<DownloadIcon />}
-                    onClick={() => handleDownload(previewFile.file.id, previewFile.file.originalName)}
-                  >
-                    Descargar
-                  </Button>
+                <Stack alignItems="center" spacing={1} sx={{ py: 6 }}>
+                  <Typography variant="body2">No hay vista previa disponible para este tipo de archivo.</Typography>
                 </Stack>
               )}
             </DialogContent>
@@ -748,15 +855,112 @@ export function ActaDetailPage() {
   );
 }
 
-function InfoField({ label, value, numeric }: { label: string; value: string | number; numeric?: boolean }) {
+/** Una produccion: encabezado con fecha y totales, y sus categorias como lista con cifra alineada. */
+function ProduccionBlock({ produccion: p }: { produccion: ProduccionResponse }) {
   return (
     <Box>
-      <Typography variant="caption" color="text.secondary" display="block">
-        {label}
-      </Typography>
-      <Typography variant="body2" sx={numeric ? numericDataSx : undefined}>
-        {value}
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="baseline" flexWrap="wrap" gap={1} sx={{ mb: 1.25 }}>
+        <Typography sx={{ fontWeight: 700, color: "text.primary", fontVariantNumeric: "tabular-nums" }}>
+          {formatActaDate(p.productionDate)}
+        </Typography>
+        <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+          {p.hasDiscrepancy && (
+            <Box component="span" sx={{ color: designTokens.status.warning.fg, fontWeight: 700, mr: 1.25 }}>
+              Discrepancia
+            </Box>
+          )}
+          Declarado{" "}
+          <Box component="strong" sx={{ color: "text.primary" }}>
+            {p.declaredTotal === null ? "—" : fmt.format(p.declaredTotal)}
+          </Box>
+          <Box component="span" sx={{ mx: 1, color: designTokens.textDisabled }}>
+            ·
+          </Box>
+          Calculado{" "}
+          <Box component="strong" sx={{ color: "text.primary" }}>
+            {fmt.format(p.calculatedTotal)}
+          </Box>
+        </Typography>
+      </Stack>
+
+      <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+        {p.values.map((v) => (
+          <Stack
+            component="li"
+            key={v.id}
+            direction="row"
+            alignItems="center"
+            gap={1.5}
+            sx={{ py: 1, borderTop: "1px solid rgba(15, 23, 42, 0.05)", "&:first-of-type": { borderTop: "none" } }}
+          >
+            <Typography variant="body2" sx={{ flex: 1, minWidth: 0, color: "text.primary" }} noWrap>
+              {v.categoryName}
+            </Typography>
+            {v.needsVerification && (
+              <Box
+                component="span"
+                sx={{
+                  px: 1,
+                  height: 22,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  borderRadius: 999,
+                  bgcolor: designTokens.status.warning.bg,
+                  color: designTokens.status.warning.fg,
+                  fontSize: "0.6875rem",
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Verificar
+              </Box>
+            )}
+            <Typography
+              sx={{ fontWeight: 700, color: "text.primary", fontVariantNumeric: "tabular-nums", minWidth: 48, textAlign: "right" }}
+            >
+              {fmt.format(v.quantity)}
+            </Typography>
+          </Stack>
+        ))}
+      </Box>
+
+      {p.observations && (
+        <Typography variant="body2" sx={{ mt: 1, whiteSpace: "pre-line" }}>
+          {p.observations}
+        </Typography>
+      )}
     </Box>
+  );
+}
+
+/** Esqueleto con la forma real de la pagina: sin spinner a media pantalla. */
+function DetailSkeleton({ back }: { back: ReactNode }) {
+  return (
+    <Stack spacing={2.5} sx={{ flexShrink: 0 }} aria-busy="true">
+      <Box>
+        <Box sx={{ ml: -1, mb: 1 }}>{back}</Box>
+        <Skeleton width={220} height={40} />
+        <Skeleton width={320} />
+      </Box>
+      <Grid container spacing={2.5}>
+        <Grid item xs={12} lg={8}>
+          <Surface>
+            <Skeleton width={140} height={28} />
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} height={40} />
+            ))}
+          </Surface>
+        </Grid>
+        <Grid item xs={12} lg={4}>
+          <Surface>
+            <Skeleton width={100} />
+            <Skeleton width={140} height={56} />
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} />
+            ))}
+          </Surface>
+        </Grid>
+      </Grid>
+    </Stack>
   );
 }

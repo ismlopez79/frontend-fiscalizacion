@@ -1,26 +1,33 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Chip, Collapse, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, InputAdornment, Link, Stack, TextField, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import dayjs from "dayjs";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import KeyIcon from "@mui/icons-material/VpnKeyOutlined";
+import PersonIcon from "@mui/icons-material/PersonOutlineRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import { userApi, roleApi } from "@/api/userApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { FloatingToolbar, toolbarFieldSx } from "@/components/ui/FloatingToolbar";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
+import SearchIcon from "@mui/icons-material/SearchRounded";
+import CloseIcon from "@mui/icons-material/CloseRounded";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useAuth } from "@/hooks/useAuth";
 import { BulkImportDialog } from "@/components/BulkImportDialog";
 import { UserAvatar } from "@/components/UserAvatar";
-import { DIGITADOR_ROLE_NAME } from "@/types/user";
+import { ADMIN_ROLE_NAME, DIGITADOR_ROLE_NAME } from "@/types/user";
 import type { UserDto } from "@/types/user";
 import { UserFormDialog } from "./UserFormDialog";
 import { ResetPasswordDialog } from "./ResetPasswordDialog";
+import { UsuarioPerfilDrawer } from "./UsuarioPerfilDrawer";
 import { useToast } from "@/hooks/useToast";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
 
@@ -28,6 +35,7 @@ type DialogState =
   | { type: "closed" }
   | { type: "create" }
   | { type: "edit"; user: UserDto }
+  | { type: "profile"; user: UserDto }
   | { type: "reset-password"; user: UserDto };
 
 export function UsuariosPage() {
@@ -41,6 +49,23 @@ export function UsuariosPage() {
     queryKey: ["usuarios"],
     queryFn: userApi.getUsuarios,
   });
+
+  // Busqueda en el cliente (el listado de usuarios llega completo) con debounce, sin acentos.
+  const [searchInput, setSearchInput] = useState("");
+  const [searchFilter, setSearchFilter] = useState("");
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearchFilter(searchInput.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+  const filteredUsers = useMemo(() => {
+    const rows = usersQuery.data ?? [];
+    if (!searchFilter) return rows;
+    const normalize = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const needle = normalize(searchFilter);
+    return rows.filter((u) =>
+      [u.username, u.fullName, u.dui, u.email, u.phone].some((v) => !!v && normalize(v).includes(needle))
+    );
+  }, [usersQuery.data, searchFilter]);
 
   const rolesQuery = useQuery({
     queryKey: ["roles"],
@@ -57,6 +82,8 @@ export function UsuariosPage() {
         // (ver columna "actions" mas abajo) — si es un registro legado sin
         // DUI, hay que editarlo completo primero para capturarlo.
         dui: target.dui ?? "",
+        // Se reenvia tal cual: el PUT reemplaza el registro completo y omitirlo lo borraria.
+        phone: target.phone ?? undefined,
         roleIds: target.roleIds,
         active: !target.active,
         delegatePoliticalPartyId: target.linkedDelegatePoliticalPartyId ?? undefined,
@@ -84,16 +111,41 @@ export function UsuariosPage() {
             userId={params.row.id}
             hasPhoto={!!params.row.profilePhotoUrl}
             fallbackText={params.row.fullName.charAt(0).toUpperCase()}
+            name={params.row.fullName}
           />
         ),
       },
       { field: "username", headerName: "Usuario", flex: 1, minWidth: 130 },
-      { field: "fullName", headerName: "Nombre completo", flex: 1.4, minWidth: 180 },
+      {
+        field: "fullName",
+        headerName: "Nombre completo",
+        flex: 1.4,
+        minWidth: 180,
+        renderCell: (params) => (
+          <Link
+            component="button"
+            type="button"
+            underline="hover"
+            color="text.primary"
+            onClick={() => setDialog({ type: "profile", user: params.row })}
+            sx={{ fontWeight: 500, textAlign: "left", textUnderlineOffset: "3px" }}
+          >
+            {params.row.fullName}
+          </Link>
+        ),
+      },
       {
         field: "dui",
         headerName: "DUI",
         width: 130,
         valueGetter: (_value, row) => row.dui ?? "—",
+      },
+      {
+        field: "phone",
+        headerName: "Teléfono",
+        width: 120,
+        valueGetter: (_value, row) => row.phone ?? "—",
+        cellClassName: "tabular-nums",
       },
       {
         field: "email",
@@ -216,16 +268,23 @@ export function UsuariosPage() {
       {
         field: "actions",
         headerName: "Acciones",
-        width: 160,
+        width: 190,
         sortable: false,
         filterable: false,
         renderCell: (params) => {
           const target = params.row;
           const isSelf = target.username === currentUser?.username;
+          // El backend rechaza (409) desactivar a un administrador; activarlo si esta permitido.
+          const isActiveAdmin = target.active && target.roles.includes(ADMIN_ROLE_NAME);
           const missingDui = !target.dui;
           const missingParty = target.roles.includes(DIGITADOR_ROLE_NAME) && !target.linkedDelegatePoliticalPartyId;
           return (
             <Stack direction="row" spacing={0.5}>
+              <Tooltip title="Ver perfil">
+                <IconButton size="small" onClick={() => setDialog({ type: "profile", user: target })}>
+                  <PersonIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="Editar usuario">
                 <IconButton size="small" onClick={() => setDialog({ type: "edit", user: target })}>
                   <EditIcon fontSize="small" />
@@ -243,7 +302,9 @@ export function UsuariosPage() {
                 title={
                   isSelf
                     ? "No puedes desactivar tu propia cuenta"
-                    : missingDui
+                    : isActiveAdmin
+                      ? "Un administrador no se puede desactivar. Primero quítale el rol ADMINISTRADOR."
+                      : missingDui
                       ? "Este usuario no tiene DUI capturado. Edítalo primero para poder cambiar su estado."
                       : missingParty
                         ? "Este usuario no tiene partido político asignado a su delegado JVE. Edítalo primero para poder cambiar su estado."
@@ -255,7 +316,7 @@ export function UsuariosPage() {
                 <span>
                   <IconButton
                     size="small"
-                    disabled={isSelf || missingDui || missingParty || toggleActiveMutation.isPending}
+                    disabled={isSelf || isActiveAdmin || missingDui || missingParty || toggleActiveMutation.isPending}
                     onClick={() => toggleActiveMutation.mutate(target)}
                   >
                     {target.active ? (
@@ -275,50 +336,76 @@ export function UsuariosPage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Usuarios</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Alta, edición y asignación de roles. No existe borrado: para dar de baja a un usuario,
-            desactívalo.
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5}>
-          <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setBulkImportOpen(true)}>
-            Carga masiva
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setDialog({ type: "create" })}
-          >
-            Nuevo usuario
-          </Button>
-        </Stack>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Usuarios"
+        subtitle="Alta, edición y asignación de roles. No existe borrado: para dar de baja a un usuario, desactívalo."
+        actions={
+          <>
+            <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setBulkImportOpen(true)}>
+              Carga masiva
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setDialog({ type: "create" })}
+            >
+              Nuevo usuario
+            </Button>
+          </>
+        }
+      />
+
+      <FloatingToolbar>
+        <TextField
+          size="small"
+          placeholder="Buscar por usuario, nombre, DUI, correo o teléfono"
+          aria-label="Buscar usuarios"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          sx={{ width: { xs: "100%", sm: 380 }, ...toolbarFieldSx }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 18 }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchInput ? (
+              <IconButton size="small" aria-label="Limpiar búsqueda" onClick={() => setSearchInput("")} edge="end">
+                <CloseIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            ) : undefined,
+          }}
+        />
+      </FloatingToolbar>
 
       <Collapse in={usersQuery.isError}>
-        <Alert severity="error">
-          {getApiErrorMessage(usersQuery.error, "No se pudo cargar el listado de usuarios.")}
-        </Alert>
+        <Callout tone="error" title="No se pudo cargar el listado de usuarios">
+          {getApiErrorMessage(usersQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
-      <Paper variant="outlined" sx={{ height: 560 }}>
-        <DataGrid
-          rows={usersQuery.data ?? []}
-          columns={columns}
-          loading={usersQuery.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-            sorting: { sortModel: [{ field: "username", sort: "asc" }] },
-          }}
-          pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
-        />
-      </Paper>
+      <DataTable
+        rows={filteredUsers}
+        columns={columns}
+        loading={usersQuery.isLoading}
+        initialState={{
+          pagination: { paginationModel: { pageSize: 10 } },
+          sorting: { sortModel: [{ field: "username", sort: "asc" }] },
+        }}
+        pageSizeOptions={[10, 25, 50]}
+        empty={
+          searchFilter
+            ? { title: "Ningún usuario coincide", hint: "Prueba con otra parte del nombre, el DUI o el correo." }
+            : { title: "Aún no hay usuarios", hint: "Usa «Nuevo usuario» o la carga masiva para agregar el primero." }
+        }
+      />
+
+      <UsuarioPerfilDrawer
+        user={dialog.type === "profile" ? dialog.user : null}
+        onClose={() => setDialog({ type: "closed" })}
+        onEdit={(user) => setDialog({ type: "edit", user })}
+      />
 
       <UserFormDialog
         open={dialog.type === "create" || dialog.type === "edit"}
@@ -337,7 +424,7 @@ export function UsuariosPage() {
       <BulkImportDialog
         open={bulkImportOpen}
         title="Carga masiva de usuarios"
-        helperText='Referencia el rol por nombre (DIGITADOR/SUPERVISOR/ADMINISTRADOR). Si dejas la columna de contraseña vacía, se genera una automáticamente y aparece en el reporte — cópiala ahí mismo, no se vuelve a mostrar.'
+        helperText='Referencia el rol por nombre (DIGITADOR/SUPERVISOR/ADMINISTRADOR). Si dejas la columna de contraseña vacía, se genera una automáticamente y aparece en el reporte — cópiala ahí mismo, no se vuelve a mostrar. La columna de teléfono (al final) es opcional, formato 1234-5678.'
         templateFilename="plantilla-usuarios.xlsx"
         onDownloadTemplate={userApi.descargarPlantilla}
         onUpload={userApi.cargaMasiva}

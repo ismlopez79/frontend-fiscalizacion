@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Chip, Collapse, IconButton, MenuItem, Paper, Stack, TextField, Tooltip, Typography } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, MenuItem, Stack, TextField, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import dayjs from "dayjs";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { assignmentApi, serviceCenterApi, temporaryDelegateApi } from "@/api/electoralApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
+import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useActiveElectoralPeriod } from "@/hooks/useActiveElectoralPeriod";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
@@ -107,83 +110,79 @@ export function AsignacionesPage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Asignaciones</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Cuadro de rotación: qué delegado (temporal o permanente/DIGITADOR) cubre qué centro de
-            servicio, por fecha. "Editar" corrige el centro o la fecha de la misma fila; para
-            cambiar de delegado, elimina la asignación y crea una nueva.
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          disabled={!periodFilter}
-          onClick={() => setCreateOpen(true)}
-        >
-          Nueva asignación
-        </Button>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Asignaciones"
+        subtitle="Cuadro de rotación: qué delegado (temporal o permanente/DIGITADOR) cubre qué centro de servicio, por fecha. «Editar» corrige el centro o la fecha de la misma fila; para cambiar de delegado, elimina la asignación y crea una nueva."
+        actions={
+          <>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              disabled={!periodFilter}
+              onClick={() => setCreateOpen(true)}
+            >
+              Nueva asignación
+            </Button>
+          </>
+        }
+      />
 
-      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" rowGap={1}>
-        <TextField
-          select
-          label="Período electoral"
-          size="small"
-          sx={{ minWidth: 260 }}
-          value={periodFilter}
-          onChange={(e) => setPeriodFilter(e.target.value === "" ? "" : Number(e.target.value))}
-        >
-          <MenuItem value="" disabled>
-            Selecciona un período
-          </MenuItem>
-          {(periodos ?? []).map((p) => (
-            <MenuItem key={p.id} value={p.id}>
-              {p.name} {p.active ? "· activo" : ""}
+      <FloatingToolbar>
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" rowGap={1.25}>
+          <TextField
+            select
+            label="Período electoral"
+            size="small"
+            sx={{ minWidth: 260 }}
+            value={periodFilter}
+            onChange={(e) => setPeriodFilter(e.target.value === "" ? "" : Number(e.target.value))}
+          >
+            <MenuItem value="" disabled>
+              Selecciona un período
             </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          label="Fecha"
-          type="date"
-          size="small"
-          sx={{ minWidth: 170 }}
-          InputLabelProps={{ shrink: true }}
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-        />
-      </Stack>
+            {(periodos ?? []).map((p) => (
+              <MenuItem key={p.id} value={p.id}>
+                {p.name} {p.active ? "· activo" : ""}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Fecha"
+            type="date"
+            size="small"
+            sx={{ minWidth: 170 }}
+            InputLabelProps={{ shrink: true }}
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
+        </Stack>
+      </FloatingToolbar>
 
       {!periodFilter && (
-        <Alert severity="info">
+        <Callout tone="info">
           Selecciona un período electoral para poder crear asignaciones (necesita sus centros y
           delegados). El listado de abajo no depende del período, solo de la fecha.
-        </Alert>
+        </Callout>
       )}
 
       <Collapse in={asignacionesQuery.isError}>
-        <Alert severity="error">
-          {getApiErrorMessage(asignacionesQuery.error, "No se pudo cargar el cuadro de asignaciones.")}
-        </Alert>
+        <Callout tone="error" title="No se pudo cargar el cuadro de asignaciones">
+          {getApiErrorMessage(asignacionesQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
-      <Paper variant="outlined" sx={{ height: 520 }}>
-        <DataGrid
+      <DataTable
           rows={asignacionesQuery.data ?? []}
           columns={columns}
           loading={asignacionesQuery.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
             sorting: { sortModel: [{ field: "serviceCenterName", sort: "asc" }] },
           }}
           pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
+          empty={{ title: "Sin asignaciones para esta fecha" }}
         />
-      </Paper>
 
       <AsignacionFormDialog
         open={createOpen}

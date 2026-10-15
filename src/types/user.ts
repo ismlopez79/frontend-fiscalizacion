@@ -9,6 +9,8 @@ export interface UserDto {
    * migracion pueden traer null hasta que alguien los edite de nuevo.
    */
   dui: string | null;
+  /** Opcional (V31), formato 1234-5678. Null si no se ha capturado. */
+  phone: string | null;
   active: boolean;
   /** Cuenta recien creada o con password reseteado por el admin: debe cambiarla antes de usar el sistema. */
   primerIngreso: boolean;
@@ -48,6 +50,8 @@ export interface RoleDto {
 }
 
 export const DIGITADOR_ROLE_NAME = "DIGITADOR";
+/** El backend rechaza (409) desactivar a un usuario con este rol. */
+export const ADMIN_ROLE_NAME = "ADMINISTRADOR";
 
 export interface CreateUserRequest {
   username: string;
@@ -56,6 +60,8 @@ export interface CreateUserRequest {
   email?: string;
   /** Requerido, formato 12345678-9, unico entre usuarios y delegados. */
   dui: string;
+  /** Opcional, formato 1234-5678. */
+  phone?: string;
   roleIds: number[];
   active: boolean;
   /** Solo importa si roleIds incluye DIGITADOR: alimenta el Delegado JVE vinculado. */
@@ -69,6 +75,8 @@ export interface UpdateUserRequest {
   email?: string;
   /** Requerido, formato 12345678-9, unico entre usuarios y delegados. */
   dui: string;
+  /** Opcional, formato 1234-5678. */
+  phone?: string;
   roleIds: number[];
   active: boolean;
   /**
@@ -80,6 +88,18 @@ export interface UpdateUserRequest {
   delegateInternalCode?: string;
   /** Solo importa si roleIds incluye DIGITADOR. Obligatorio al editar (409 si se omite). */
   delegatePoliticalPartyId?: number;
+}
+
+/**
+ * Autoservicio de perfil (PATCH /usuarios/me y /delegados-temporales/me):
+ * lo UNICO que una persona puede cambiar de su propia cuenta. Nombre, DUI,
+ * username, roles y estado son de solo lectura — el endpoint ni los acepta.
+ * null = dejar el campo vacio.
+ */
+export interface SelfProfileUpdateRequest {
+  email: string | null;
+  /** Formato 1234-5678; el backend responde 400 si no cumple. */
+  phone: string | null;
 }
 
 export interface ResetPasswordRequest {

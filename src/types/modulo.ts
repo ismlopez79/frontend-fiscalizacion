@@ -1,5 +1,5 @@
 /** Hoy solo existe "ELECTIONS"; el shape ya es genérico por si se agregan más módulos apagables. */
-export type ModuloCode = "ELECTIONS";
+export type ModuloCode = "ELECTIONS" | "TRAINING";
 
 export interface ModuloDto {
   code: ModuloCode;

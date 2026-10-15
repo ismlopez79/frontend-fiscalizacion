@@ -27,7 +27,8 @@ import { userApi } from "@/api/userApi";
 import { catalogApi } from "@/api/catalogApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { DUI_HELPER_TEXT, DUI_REGEX, formatDuiInput } from "@/utils/dui";
-import { DIGITADOR_ROLE_NAME } from "@/types/user";
+import { PHONE_HELPER_TEXT, PHONE_REGEX, formatPhoneInput } from "@/utils/phone";
+import { ADMIN_ROLE_NAME, DIGITADOR_ROLE_NAME } from "@/types/user";
 import type { RoleDto, UserDto } from "@/types/user";
 
 /**
@@ -39,18 +40,20 @@ import type { RoleDto, UserDto } from "@/types/user";
 const formSchema = z.object({
   username: z
     .string()
-    .min(1, "El usuario es obligatorio")
-    .regex(/^[a-zA-Z0-9._-]+$/, "Solo letras, números, puntos, guiones y guion bajo"),
+    .min(3, "El usuario debe tener al menos 3 caracteres")
+    .max(50, "Máximo 50 caracteres")
+    .regex(/^[a-zA-Z0-9._-]+$/, "Solo letras sin tilde, números, punto, guion y guion bajo"),
   password: z.string().optional(),
-  fullName: z.string().min(1, "El nombre completo es obligatorio"),
-  email: z.union([z.literal(""), z.string().email("Correo inválido")]).optional(),
+  fullName: z.string().min(1, "El nombre completo es obligatorio").max(150, "Máximo 150 caracteres"),
+  email: z.union([z.literal(""), z.string().email("Correo inválido").max(150, "Máximo 150 caracteres")]).optional(),
   dui: z
     .string()
     .min(1, "El DUI es obligatorio")
     .regex(DUI_REGEX, "Formato inválido, debe ser 12345678-9"),
+  phone: z.union([z.literal(""), z.string().regex(PHONE_REGEX, "Formato inválido, debe ser 1234-5678")]),
   roleIds: z.array(z.number()).min(1, "Selecciona al menos un rol"),
   active: z.boolean(),
-  delegateInternalCode: z.string().optional(),
+  delegateInternalCode: z.string().max(50, "Máximo 50 caracteres").optional(),
   delegatePoliticalPartyId: z.number().nullable(),
 });
 
@@ -84,6 +87,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
       fullName: "",
       email: "",
       dui: "",
+      phone: "",
       roleIds: [],
       active: true,
       delegateInternalCode: "",
@@ -94,6 +98,12 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
   const selectedRoleIds = useWatch({ control, name: "roleIds" }) ?? [];
   const digitadorRole = roles.find((r) => r.name === DIGITADOR_ROLE_NAME);
   const isDigitadorSelected = !!digitadorRole && selectedRoleIds.includes(digitadorRole.id);
+  // Un administrador no se puede desactivar (el backend responde 409). Cuenta
+  // tanto el rol guardado como el marcado ahora: quitar el rol y desactivar
+  // son dos ediciones separadas.
+  const adminRole = roles.find((r) => r.name === ADMIN_ROLE_NAME);
+  const isAdmin =
+    (!!adminRole && selectedRoleIds.includes(adminRole.id)) || (isEdit && !!user?.roles.includes(ADMIN_ROLE_NAME));
 
   const partidosQuery = useQuery({
     queryKey: ["partidos-politicos"],
@@ -112,6 +122,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         fullName: user.fullName,
         email: user.email ?? "",
         dui: user.dui ?? "",
+        phone: user.phone ?? "",
         roleIds: user.roleIds,
         active: user.active,
         // El backend no devuelve el codigo actual del delegado vinculado
@@ -127,6 +138,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         fullName: "",
         email: "",
         dui: "",
+        phone: "",
         roleIds: [],
         active: true,
         delegateInternalCode: "",
@@ -143,6 +155,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         fullName: values.fullName,
         email: values.email || undefined,
         dui: values.dui,
+        phone: values.phone || undefined,
         roleIds: values.roleIds,
         active: values.active,
         delegateInternalCode: values.delegateInternalCode || undefined,
@@ -162,6 +175,7 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
         fullName: values.fullName,
         email: values.email || undefined,
         dui: values.dui,
+        phone: values.phone || undefined,
         roleIds: values.roleIds,
         active: values.active,
         // Omitido por completo si esta vacio: el backend sincroniza el
@@ -297,6 +311,23 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
             />
 
             <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  label="Teléfono (opcional)"
+                  fullWidth
+                  placeholder="7123-4567"
+                  inputProps={{ inputMode: "numeric", autoComplete: "tel" }}
+                  onChange={(e) => field.onChange(formatPhoneInput(e.target.value))}
+                  error={!!errors.phone}
+                  helperText={errors.phone?.message ?? PHONE_HELPER_TEXT}
+                />
+              )}
+            />
+
+            <Controller
               name="roleIds"
               control={control}
               render={({ field }) => (
@@ -376,19 +407,28 @@ export function UserFormDialog({ open, mode, user, roles, onClose }: UserFormDia
               name="active"
               control={control}
               render={({ field }) => (
-                <FormControlLabel
-                  control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
-                  label={
-                    <Typography variant="body2">
-                      {field.value ? "Usuario activo" : "Usuario inactivo"}
+                <Box>
+                  <FormControlLabel
+                    disabled={isAdmin && field.value}
+                    control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                    label={
+                      <Typography variant="body2">
+                        {field.value ? "Usuario activo" : "Usuario inactivo"}
+                      </Typography>
+                    }
+                  />
+                  {isAdmin && field.value && (
+                    <Typography variant="caption" component="p" sx={{ mt: 0.25 }}>
+                      Un administrador no se puede desactivar. Para darlo de baja, primero quítale el rol
+                      ADMINISTRADOR y guarda; después desactívalo.
                     </Typography>
-                  }
-                />
+                  )}
+                </Box>
               )}
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={isSaving}>
             Cancelar
           </Button>

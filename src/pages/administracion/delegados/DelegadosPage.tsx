@@ -1,20 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Collapse,
-  IconButton,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, MenuItem, Stack, TextField, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -23,6 +9,10 @@ import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import { catalogApi } from "@/api/catalogApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
+import { FloatingToolbar, toolbarFieldSx } from "@/components/ui/FloatingToolbar";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { DELEGATE_TYPES, DELEGATE_TYPE_LABELS } from "@/types/catalog";
 import type { DelegateDto, DelegateType } from "@/types/catalog";
@@ -72,8 +62,8 @@ export function DelegadosPage() {
 
   const columns: GridColDef<DelegateDto>[] = useMemo(
     () => [
-      { field: "firstName", headerName: "Nombre", flex: 1, minWidth: 140 },
-      { field: "lastName", headerName: "Apellido", flex: 1, minWidth: 140 },
+      { field: "firstName", headerName: "Nombre", flex: 1, minWidth: 140, cellClassName: "cell-strong" },
+      { field: "lastName", headerName: "Apellido", flex: 1, minWidth: 140, cellClassName: "cell-strong" },
       {
         field: "internalCode",
         headerName: "Código interno",
@@ -213,54 +203,55 @@ export function DelegadosPage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Delegados</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Personas que firman el acta: delegado JVE, delegado RNPN o jefe de duicentro.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
-          Nuevo delegado
-        </Button>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Delegados"
+        subtitle="Personas que firman el acta: delegado JVE, delegado RNPN o jefe de duicentro."
+        actions={
+          <>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
+              Nuevo delegado
+            </Button>
+          </>
+        }
+      />
 
-      <TextField
-        select
-        label="Filtrar por tipo"
-        size="small"
-        sx={{ maxWidth: 260 }}
-        value={typeFilter}
-        onChange={(e) => setTypeFilter(e.target.value as DelegateType | "")}
-      >
-        <MenuItem value="">Todos los tipos</MenuItem>
-        {DELEGATE_TYPES.map((type) => (
-          <MenuItem key={type} value={type}>
-            {DELEGATE_TYPE_LABELS[type]}
-          </MenuItem>
-        ))}
-      </TextField>
+      <FloatingToolbar>
+        <TextField
+          select
+          size="small"
+          aria-label="Filtrar por tipo"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as DelegateType | "")}
+          SelectProps={{ displayEmpty: true }}
+          sx={{ minWidth: 220, ...toolbarFieldSx }}
+        >
+          <MenuItem value="">Todos los tipos</MenuItem>
+          {DELEGATE_TYPES.map((type) => (
+            <MenuItem key={type} value={type}>
+              {DELEGATE_TYPE_LABELS[type]}
+            </MenuItem>
+          ))}
+        </TextField>
+      </FloatingToolbar>
 
       <Collapse in={delegadosQuery.isError}>
-        <Alert severity="error">{getApiErrorMessage(delegadosQuery.error, "No se pudo cargar el catálogo.")}</Alert>
+        <Callout tone="error" title="No se pudo cargar el catálogo">
+          {getApiErrorMessage(delegadosQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
-      <Paper variant="outlined" sx={{ height: 520 }}>
-        <DataGrid
+      <DataTable
           rows={delegadosQuery.data ?? []}
           columns={columns}
           loading={delegadosQuery.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
             sorting: { sortModel: [{ field: "lastName", sort: "asc" }] },
           }}
           pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
+          empty={{ title: "Ningún delegado", hint: "Usa el botón de arriba para agregar el primero." }}
         />
-      </Paper>
 
       <DelegadoFormDialog
         open={dialog.type === "create" || dialog.type === "edit"}

@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Alert,
+  Box,
+  ButtonBase,
   Button,
   Chip,
   Dialog,
@@ -19,6 +21,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { designTokens } from "@/theme/theme";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
 import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopyOutlined";
@@ -152,48 +155,84 @@ export function BulkImportDialog({
 
           {!result && (
             <>
-              <Alert severity="info">
-                1. Descarga la plantilla. 2. Llénala respetando las columnas y notas de formato. 3.
-                Súbela aquí. Ninguna fila mala detiene a las demás: cada una se procesa de forma
-                independiente y el reporte te dice exactamente qué pasó en cada una.
-              </Alert>
-
-              <Stack direction="row" spacing={1.5} flexWrap="wrap" rowGap={1}>
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
-                  onClick={handleDownloadTemplate}
-                  disabled={isDownloading}
-                >
-                  Descargar plantilla
-                </Button>
-
-                <Button
-                  variant="outlined"
-                  component="label"
-                  startIcon={<UploadFileIcon />}
-                >
-                  {selectedFile ? selectedFile.name : "Seleccionar archivo .xlsx"}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    hidden
-                    accept=".xlsx"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-                  />
-                </Button>
+              {/* Tres pasos en orden: aqui la numeracion si informa (es una secuencia real). */}
+              <Stack component="ol" spacing={1.5} sx={{ listStyle: "none", m: 0, p: 0 }}>
+                <StepRow n={1} title="Descarga la plantilla" hint="Trae las columnas y notas de formato que espera el sistema.">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={handleDownloadTemplate}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? "Descargando…" : "Descargar"}
+                  </Button>
+                </StepRow>
+                <StepRow n={2} title="Llénala" hint="Respeta el orden de las columnas; las opcionales pueden quedar vacías." />
+                <StepRow n={3} title="Súbela aquí" hint="Ninguna fila mala detiene a las demás: el reporte te dice qué pasó en cada una." />
               </Stack>
+
+              <ButtonBase
+                component="label"
+                sx={{
+                  width: "100%",
+                  py: 2.5,
+                  px: 2,
+                  gap: 1.5,
+                  borderRadius: "16px",
+                  border: "1.5px dashed",
+                  borderColor: selectedFile ? designTokens.accent : "rgba(15, 23, 42, 0.16)",
+                  bgcolor: selectedFile ? designTokens.accentSoft : "transparent",
+                  justifyContent: "flex-start",
+                  textAlign: "left",
+                  transition: `background-color 150ms ease, border-color 150ms ease, transform 160ms ${designTokens.easeOut}`,
+                  "&:active": { transform: "scale(0.985)" },
+                  "&:focus-within": { boxShadow: designTokens.focusRing },
+                  "@media (hover: hover) and (pointer: fine)": {
+                    "&:hover": { borderColor: designTokens.accent, bgcolor: designTokens.accentSoft },
+                  },
+                }}
+              >
+                <UploadFileIcon sx={{ color: designTokens.accent }} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: "text.primary" }}>
+                    {selectedFile ? selectedFile.name : "Seleccionar archivo .xlsx"}
+                  </Typography>
+                  <Typography variant="caption">
+                    {selectedFile ? "Toca para elegir otro archivo" : "Solo archivos de Excel (.xlsx)"}
+                  </Typography>
+                </Box>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  hidden
+                  accept=".xlsx"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                />
+              </ButtonBase>
             </>
           )}
 
           {result && (
             <>
-              <Stack direction="row" spacing={1.5} flexWrap="wrap" rowGap={1}>
-                <Chip label={`Total: ${result.totalRows}`} variant="outlined" />
-                <Chip label={`Creados: ${result.created}`} color="success" variant="outlined" />
-                <Chip label={`Omitidos: ${result.skipped}`} color="warning" variant="outlined" />
-                <Chip label={`Errores: ${result.errors}`} color="error" variant="outlined" />
-              </Stack>
+              <Box
+                component="dl"
+                sx={{
+                  m: 0,
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" },
+                  gap: "1px",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  bgcolor: "rgba(15, 23, 42, 0.06)",
+                  boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.06)",
+                }}
+              >
+                <ResultStat label="Filas" value={result.totalRows} />
+                <ResultStat label="Creados" value={result.created} color={designTokens.status.success.fg} />
+                <ResultStat label="Omitidos" value={result.skipped} color={result.skipped > 0 ? designTokens.status.warning.fg : undefined} />
+                <ResultStat label="Errores" value={result.errors} color={result.errors > 0 ? designTokens.status.error.fg : undefined} />
+              </Box>
 
               {hasGeneratedPasswords && (
                 <Alert severity="warning">
@@ -203,7 +242,16 @@ export function BulkImportDialog({
                 </Alert>
               )}
 
-              <TableContainer sx={{ maxHeight: 360, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <TableContainer
+                sx={{
+                  maxHeight: 360,
+                  borderRadius: "14px",
+                  boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.08)",
+                  overscrollBehavior: "contain",
+                  "& .MuiTableCell-root": { borderColor: "rgba(15, 23, 42, 0.06)" },
+                  "& .MuiTableCell-head": { bgcolor: "#FBFCFD" },
+                }}
+              >
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
@@ -217,13 +265,12 @@ export function BulkImportDialog({
                       const passwordMatch = detail.message.match(TEMP_PASSWORD_PATTERN);
                       return (
                         <TableRow key={detail.row} hover>
-                          <TableCell>{detail.row}</TableCell>
+                          <TableCell sx={{ fontVariantNumeric: "tabular-nums" }}>{detail.row}</TableCell>
                           <TableCell>
                             <Chip
                               size="small"
                               label={STATUS_LABEL[detail.status]}
                               color={STATUS_COLOR[detail.status]}
-                              variant="outlined"
                             />
                           </TableCell>
                           <TableCell>
@@ -251,7 +298,7 @@ export function BulkImportDialog({
           )}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions>
         {!result ? (
           <>
             <Button onClick={handleClose} color="inherit" disabled={uploadMutation.isPending}>
@@ -277,5 +324,53 @@ export function BulkImportDialog({
         )}
       </DialogActions>
     </Dialog>
+  );
+}
+
+function StepRow({ n, title, hint, children }: { n: number; title: string; hint: string; children?: React.ReactNode }) {
+  return (
+    <Stack component="li" direction="row" gap={1.5} alignItems="center">
+      <Box
+        aria-hidden
+        sx={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: designTokens.accentSoft,
+          color: designTokens.accent,
+          fontWeight: 700,
+          fontSize: "0.8125rem",
+        }}
+      >
+        {n}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
+          {title}
+        </Typography>
+        <Typography variant="body2">{hint}</Typography>
+      </Box>
+      {children}
+    </Stack>
+  );
+}
+
+function ResultStat({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <Box sx={{ bgcolor: "background.paper", px: 2, py: 1.75 }}>
+      <Typography component="dt" variant="body2" sx={{ fontWeight: 500 }}>
+        {label}
+      </Typography>
+      <Typography
+        component="dd"
+        sx={{ m: 0, fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", color: color ?? "text.primary" }}
+      >
+        {value}
+      </Typography>
+    </Box>
   );
 }

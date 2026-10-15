@@ -5,12 +5,15 @@ export function LoginFooter() {
     <Typography
       sx={{
         textAlign: "center",
-        fontSize: 12.5,
-        color: "#6B7280",
-        mt: 3,
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: "0.24em",
+        color: "rgba(13, 27, 42, 0.38)",
+        mt: 3.5,
+        userSelect: "none",
       }}
     >
-      Versión 1.0.0 • Sistema Actas JVE
+      JVE
     </Typography>
   );
 }

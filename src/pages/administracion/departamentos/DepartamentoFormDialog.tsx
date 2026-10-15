@@ -24,7 +24,7 @@ import type { DepartmentDto } from "@/types/catalog";
 
 const schema = z.object({
   code: z.string().min(1, "El código es obligatorio").max(10, "Máximo 10 caracteres"),
-  name: z.string().min(1, "El nombre es obligatorio"),
+  name: z.string().min(1, "El nombre es obligatorio").max(120, "Máximo 120 caracteres"),
   active: z.boolean(),
 });
 
@@ -120,7 +120,7 @@ export function DepartamentoFormDialog({ open, departamento, onClose }: Departam
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

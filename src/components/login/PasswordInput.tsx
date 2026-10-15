@@ -41,7 +41,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(fu
                 sx={{
                   color: loginTokens.iconMuted,
                   transition: `color 150ms ${loginTokens.ease}, transform 120ms ${loginTokens.ease}`,
-                  "&:hover": { color: loginTokens.navy },
+                  "@media (hover: hover) and (pointer: fine)": { "&:hover": { color: loginTokens.navy } },
                   "&:active": { transform: "scale(0.9)" },
                 }}
               >

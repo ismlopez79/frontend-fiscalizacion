@@ -123,7 +123,7 @@ export function AsignacionEditDialog({ open, asignacion, centros, onClose }: Asi
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

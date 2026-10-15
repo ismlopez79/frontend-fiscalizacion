@@ -10,11 +10,19 @@ import type { ApiErrorResponse } from "@/types/common";
  * que caer a un mensaje generico por codigo HTTP en vez de asumir
  * error.response.data.message.
  */
-export function getApiErrorMessage(error: unknown, fallback = "Ocurrió un error inesperado."): string {
+export function getApiErrorMessage(
+  error: unknown,
+  fallback = "Ocurrió un error inesperado.",
+  /** En el login un 401 sin message no es "sesion expirada": se usa el fallback. */
+  options: { preferFallbackOn401?: boolean } = {}
+): string {
   if (!(error instanceof AxiosError)) {
     return fallback;
   }
 
+  // Cualquier codigo del backend (MALFORMED_REQUEST, INVALID_PARAMETER,
+  // MISSING_PARAMETER, DATA_CONFLICT, PAYLOAD_TOO_LARGE, TOO_MANY_ATTEMPTS...)
+  // llega con su message listo para mostrar.
   const data = error.response?.data as Partial<ApiErrorResponse> | undefined;
   if (data?.message) {
     return data.message;
@@ -24,7 +32,10 @@ export function getApiErrorMessage(error: unknown, fallback = "Ocurrió un error
     case 400:
       return "Revisa los datos del formulario: hay campos inválidos.";
     case 401:
+      if (options.preferFallbackOn401) return fallback;
       return "Tu sesión expiró o no es válida. Vuelve a iniciar sesión.";
+    case 429:
+      return "Demasiados intentos. Espera unos minutos antes de volver a intentar.";
     case 403:
       return "No tienes permiso para realizar esta acción.";
     case 404:
@@ -32,7 +43,7 @@ export function getApiErrorMessage(error: unknown, fallback = "Ocurrió un error
     case 409:
       return "La operación no se puede completar por una regla de negocio.";
     case 413:
-      return "El archivo supera el tamaño máximo permitido.";
+      return "Lo enviado supera el tamaño máximo permitido.";
     default:
       return fallback;
   }

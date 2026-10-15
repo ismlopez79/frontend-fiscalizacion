@@ -1,12 +1,12 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
-import { Alert, Box, Button, CircularProgress, Divider, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
+import { Box, Button, Divider, Skeleton, Stack, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBackRounded";
 import SendIcon from "@mui/icons-material/SendOutlined";
 import ReplayIcon from "@mui/icons-material/ReplayOutlined";
-import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
@@ -17,16 +17,14 @@ import { EstadoActaChip } from "@/components/EstadoActaChip";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
 import { useToast } from "@/hooks/useToast";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
-
-function formatDateTime(value: string): string {
-  return dayjs(value).format("DD/MM/YYYY HH:mm");
-}
-
-const ANSWER_TYPE_LABELS: Record<string, string> = {
-  SI_NO: "Sí / No",
-  SI_NO_PARCIAL: "Sí / No / Parcial",
-  TEXTO_LIBRE: "Texto libre",
-};
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionHeader, Surface } from "@/components/ui/Surface";
+import { Callout } from "@/components/ui/Callout";
+import { DetailRow } from "@/components/ui/DetailRow";
+import { designTokens } from "@/theme/theme";
+import { formatDate, formatDateTime, formatTime } from "@/utils/dateFormat";
+import type { FiscalizationAnswerResponse } from "@/types/fiscalizacionForm";
+import { ANSWER_TYPE_LABELS } from "./fiscalizacionUi";
 
 export function FiscalizacionDetailPage() {
   const { id } = useParams();
@@ -114,16 +112,43 @@ export function FiscalizacionDetailPage() {
     onError: (error) => showToast("error", getApiErrorMessage(error, "No se pudo anular el formulario.")),
   });
 
+  const backButton = (
+    <Button size="small" color="inherit" startIcon={<ArrowBackIcon />} onClick={() => navigate("/fiscalizacion")}>
+      Fiscalización
+    </Button>
+  );
+
   if (formularioQuery.isLoading) {
     return (
-      <Stack alignItems="center" sx={{ py: 8 }}>
-        <CircularProgress />
+      <Stack spacing={2.5} sx={{ flexShrink: 0 }} aria-busy="true">
+        <Box>
+          <Box sx={{ ml: -1, mb: 1 }}>{backButton}</Box>
+          <Skeleton width={240} height={40} />
+          <Skeleton width={300} />
+        </Box>
+        <Surface>
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} height={36} />
+          ))}
+        </Surface>
+        <Surface>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} height={44} />
+          ))}
+        </Surface>
       </Stack>
     );
   }
 
   if (formularioQuery.isError || !formulario) {
-    return <Alert severity="error">{getApiErrorMessage(formularioQuery.error, "No se pudo cargar el formulario.")}</Alert>;
+    return (
+      <Stack spacing={2} sx={{ flexShrink: 0 }}>
+        <Box sx={{ ml: -1 }}>{backButton}</Box>
+        <Callout tone="error" title="No se pudo cargar el formulario">
+          {getApiErrorMessage(formularioQuery.error, "Puede que ya no exista o que no tengas acceso a él.")}
+        </Callout>
+      </Stack>
+    );
   }
 
   const canSendToReview = canEdit && (formulario.status === "REGISTRADA" || formulario.status === "OBSERVADA");
@@ -133,148 +158,142 @@ export function FiscalizacionDetailPage() {
   const canRechazar = isReviewer && formulario.status === "PENDIENTE_REVISION";
   const canAnular = isAdmin && formulario.status !== "ANULADA";
 
+  const arrival = formatTime(formulario.arrivalTime);
+  const departure = formatTime(formulario.departureTime);
+  const answered = formulario.respuestas.length;
+
   return (
-    <Stack spacing={2.5}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => navigate("/fiscalizacion")}
-        sx={{ alignSelf: "flex-start" }}
-        color="inherit"
-      >
-        Volver a fiscalización
-      </Button>
-
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Typography variant="h3">{formulario.formNumber ?? "Sin número asignado"}</Typography>
-          <EstadoActaChip estado={formulario.status} />
-        </Stack>
-
-        <Stack direction="row" spacing={1.5} flexWrap="wrap" rowGap={1}>
-          {canResume && (
-            <Button
-              variant="outlined"
-              startIcon={<ReplayIcon />}
-              onClick={() => setConfirmAction("reanudar")}
-              disabled={reanudarMutation.isPending}
-            >
-              Reanudar para corregir
-            </Button>
-          )}
-          {canSendToReview && (
-            <Button
-              variant="contained"
-              startIcon={<SendIcon />}
-              onClick={() => setConfirmAction("enviar-revision")}
-              disabled={enviarRevisionMutation.isPending}
-            >
-              Enviar a revisión
-            </Button>
-          )}
-          {canRechazar && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<CancelOutlinedIcon />}
-              onClick={() => setConfirmAction("rechazar")}
-              disabled={rechazarMutation.isPending}
-            >
-              Rechazar
-            </Button>
-          )}
-          {canObservar && (
-            <Button
-              variant="outlined"
-              color="warning"
-              startIcon={<FlagOutlinedIcon />}
-              onClick={() => setConfirmAction("observar")}
-              disabled={observarMutation.isPending}
-            >
-              Observar
-            </Button>
-          )}
-          {canApprove && (
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircleOutlineRoundedIcon />}
-              onClick={() => setConfirmAction("aprobar")}
-              disabled={aprobarMutation.isPending}
-            >
-              Aprobar
-            </Button>
-          )}
-          {canAnular && (
-            <Button
-              variant="text"
-              color="error"
-              startIcon={<BlockOutlinedIcon />}
-              onClick={() => setConfirmAction("anular")}
-              disabled={anularMutation.isPending}
-            >
-              Anular
-            </Button>
-          )}
-        </Stack>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        back={backButton}
+        title={
+          formulario.formNumber ? (
+            <Box component="span" sx={{ fontVariantNumeric: "tabular-nums" }}>
+              {formulario.formNumber}
+            </Box>
+          ) : (
+            "Sin número asignado"
+          )
+        }
+        titleAdornment={<EstadoActaChip estado={formulario.status} size="medium" />}
+        subtitle={`${formulario.serviceCenterName} · ${formatDate(formulario.formDate)} · ${formulario.delegateName}`}
+        actions={
+          <>
+            {canAnular && (
+              <Button
+                color="error"
+                startIcon={<BlockOutlinedIcon />}
+                onClick={() => setConfirmAction("anular")}
+                disabled={anularMutation.isPending}
+              >
+                Anular
+              </Button>
+            )}
+            {canResume && (
+              <Button
+                variant="outlined"
+                startIcon={<ReplayIcon />}
+                onClick={() => setConfirmAction("reanudar")}
+                disabled={reanudarMutation.isPending}
+              >
+                Reanudar para corregir
+              </Button>
+            )}
+            {canSendToReview && (
+              <Button
+                variant="contained"
+                startIcon={<SendIcon />}
+                onClick={() => setConfirmAction("enviar-revision")}
+                disabled={enviarRevisionMutation.isPending}
+              >
+                Enviar a revisión
+              </Button>
+            )}
+            {canRechazar && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<CancelOutlinedIcon />}
+                onClick={() => setConfirmAction("rechazar")}
+                disabled={rechazarMutation.isPending}
+              >
+                Rechazar
+              </Button>
+            )}
+            {canObservar && (
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<FlagOutlinedIcon />}
+                onClick={() => setConfirmAction("observar")}
+                disabled={observarMutation.isPending}
+              >
+                Observar
+              </Button>
+            )}
+            {canApprove && (
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<CheckRoundedIcon />}
+                onClick={() => setConfirmAction("aprobar")}
+                disabled={aprobarMutation.isPending}
+              >
+                Aprobar
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {formulario.status === "OBSERVADA" && (
-        <Alert severity="info">
-          Este formulario fue observado por el revisor. Consulta con el revisor por fuera del
-          sistema qué hay que corregir antes de reanudarlo.
-        </Alert>
+        <Callout tone="info" title="El revisor observó este formulario">
+          Consulta con el revisor qué hay que corregir antes de reanudarlo.
+        </Callout>
       )}
 
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack spacing={1.5}>
-          <Typography variant="h4">Identificación</Typography>
-          <Stack direction="row" flexWrap="wrap" columnGap={4} rowGap={1.5}>
-            <InfoField label="Centro de servicio" value={formulario.serviceCenterName} />
-            <InfoField label="Fecha" value={formulario.formDate} />
-            <InfoField label="Hora de llegada" value={formulario.arrivalTime ?? "—"} />
-            <InfoField label="Hora de salida" value={formulario.departureTime ?? "—"} />
-            <InfoField label="Delegado" value={formulario.delegateName} />
-            <InfoField label="Creado el" value={formatDateTime(formulario.createdAt)} />
-            <InfoField label="Última actualización" value={formatDateTime(formulario.updatedAt)} />
-          </Stack>
-          {formulario.observations && (
-            <>
-              <Divider />
-              <InfoField label="Observaciones" value={formulario.observations} />
-            </>
-          )}
-        </Stack>
-      </Paper>
-
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack spacing={1.5}>
-          <Typography variant="h4">Checklist de fiscalización</Typography>
-          {formulario.respuestas.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              Sin respuestas registradas.
+      <Surface>
+        <SectionHeader title="Identificación" />
+        <Box
+          component="dl"
+          sx={{ m: 0, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, columnGap: 4, rowGap: 1.5 }}
+        >
+          <DetailRow label="Centro de servicio" value={formulario.serviceCenterName} />
+          <DetailRow label="Fecha" value={formatDate(formulario.formDate)} numeric />
+          <DetailRow label="Hora de llegada" value={arrival} numeric />
+          <DetailRow label="Hora de salida" value={departure} numeric />
+          <DetailRow label="Delegado" value={formulario.delegateName} />
+          <DetailRow label="Creado" value={formatDateTime(formulario.createdAt)} numeric />
+          <DetailRow label="Actualizado" value={formatDateTime(formulario.updatedAt)} numeric />
+        </Box>
+        {formulario.observations && (
+          <>
+            <Divider sx={{ my: 2.5, borderColor: "rgba(15, 23, 42, 0.06)" }} />
+            <Typography variant="body2" sx={{ color: designTokens.textCaption, mb: 0.5 }}>
+              Observaciones
             </Typography>
-          ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Pregunta</TableCell>
-                  <TableCell width={160}>Tipo</TableCell>
-                  <TableCell width={160}>Respuesta</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {formulario.respuestas.map((r) => (
-                  <TableRow key={r.questionId}>
-                    <TableCell>{r.questionText}</TableCell>
-                    <TableCell>{ANSWER_TYPE_LABELS[r.answerType] ?? r.answerType}</TableCell>
-                    <TableCell>{r.answer || "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Stack>
-      </Paper>
+            <Typography variant="body1" sx={{ whiteSpace: "pre-line", maxWidth: "70ch" }}>
+              {formulario.observations}
+            </Typography>
+          </>
+        )}
+      </Surface>
+
+      <Surface>
+        <SectionHeader
+          title="Checklist de fiscalización"
+          subtitle={answered > 0 ? `${answered} ${answered === 1 ? "pregunta respondida" : "preguntas respondidas"}.` : undefined}
+        />
+        {answered === 0 ? (
+          <Typography variant="body2">Sin respuestas registradas.</Typography>
+        ) : (
+          <Box component="ol" sx={{ listStyle: "none", m: 0, p: 0 }}>
+            {formulario.respuestas.map((r) => (
+              <AnswerRow key={r.questionId} respuesta={r} />
+            ))}
+          </Box>
+        )}
+      </Surface>
 
       <ConfirmacionAccion
         open={confirmAction === "enviar-revision"}
@@ -358,13 +377,67 @@ export function FiscalizacionDetailPage() {
   );
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary" display="block">
-        {label}
+const ANSWER_TONE: Record<string, { bg: string; fg: string }> = {
+  Sí: designTokens.status.success,
+  No: designTokens.status.error,
+  Parcial: designTokens.status.warning,
+};
+
+/** Pregunta + respuesta. Si/No/Parcial como pastilla (texto + color); texto libre como parrafo debajo. */
+function AnswerRow({ respuesta: r }: { respuesta: FiscalizationAnswerResponse }) {
+  const isText = r.answerType === "TEXTO_LIBRE";
+  const tone = ANSWER_TONE[r.answer];
+  let answer: ReactNode;
+  if (!r.answer) {
+    answer = (
+      <Typography variant="body2" sx={{ color: designTokens.textDisabled }}>
+        Sin respuesta
       </Typography>
-      <Typography variant="body2">{value}</Typography>
+    );
+  } else if (isText || !tone) {
+    answer = (
+      <Typography variant="body2" sx={{ color: "text.primary", whiteSpace: "pre-line", mt: 0.5 }}>
+        {r.answer}
+      </Typography>
+    );
+  } else {
+    answer = (
+      <Box
+        component="span"
+        sx={{
+          px: 1.25,
+          height: 26,
+          display: "inline-flex",
+          alignItems: "center",
+          borderRadius: 999,
+          bgcolor: tone.bg,
+          color: tone.fg,
+          fontWeight: 700,
+          fontSize: "0.8125rem",
+          flexShrink: 0,
+        }}
+      >
+        {r.answer}
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      component="li"
+      sx={{ py: 1.5, borderTop: "1px solid rgba(15, 23, 42, 0.06)", "&:first-of-type": { borderTop: "none", pt: 0 } }}
+    >
+      <Stack direction={isText ? "column" : "row"} alignItems={isText ? "stretch" : "center"} gap={isText ? 0 : 2}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 500 }}>
+            {r.questionText}
+          </Typography>
+          <Typography variant="caption" sx={{ fontWeight: 500 }}>
+            {ANSWER_TYPE_LABELS[r.answerType] ?? r.answerType}
+          </Typography>
+        </Box>
+        {answer}
+      </Stack>
     </Box>
   );
 }

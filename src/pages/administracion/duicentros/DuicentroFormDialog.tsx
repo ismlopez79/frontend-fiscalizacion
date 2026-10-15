@@ -24,9 +24,9 @@ import type { DuicentroDto } from "@/types/catalog";
 
 const schema = z.object({
   code: z.string().min(1, "El código es obligatorio").max(20, "Máximo 20 caracteres"),
-  name: z.string().min(1, "El nombre es obligatorio"),
+  name: z.string().min(1, "El nombre es obligatorio").max(150, "Máximo 150 caracteres"),
   departmentId: z.number({ invalid_type_error: "Selecciona un departamento" }).min(1, "Selecciona un departamento"),
-  address: z.string().optional(),
+  address: z.string().max(255, "Máximo 255 caracteres").optional(),
   active: z.boolean(),
 });
 
@@ -164,7 +164,7 @@ export function DuicentroFormDialog({ open, duicentro, onClose }: DuicentroFormD
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

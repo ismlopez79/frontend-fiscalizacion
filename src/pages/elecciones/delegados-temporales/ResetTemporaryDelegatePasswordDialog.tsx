@@ -27,7 +27,7 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import type { TemporaryDelegateDto } from "@/types/electoral";
 
 const schema = z.object({
-  newPassword: z.union([z.literal(""), z.string().min(8, "Mínimo 8 caracteres")]),
+  newPassword: z.union([z.literal(""), z.string().min(8, "Mínimo 8 caracteres").max(72, "Máximo 72 caracteres")]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -147,7 +147,7 @@ export function ResetTemporaryDelegatePasswordDialog({
               </Typography>
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions>
             <Button variant="contained" onClick={handleClose}>
               Cerrar
             </Button>
@@ -204,7 +204,7 @@ export function ResetTemporaryDelegatePasswordDialog({
               )}
             />
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions>
             <Button onClick={handleClose} color="inherit">
               Cancelar
             </Button>

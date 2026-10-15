@@ -1,22 +1,13 @@
 import { Controller, useFieldArray, useFormContext } from "react-hook-form";
-import {
-  Box,
-  Collapse,
-  IconButton,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, Button, ButtonBase, Collapse, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/AddRounded";
 import RemoveIcon from "@mui/icons-material/RemoveRounded";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMoreRounded";
-import { numericDataSx } from "@/theme/theme";
+import { designTokens } from "@/theme/theme";
 import type { ProductionCategoryDto } from "@/types/catalog";
 import type { ActaFormValues } from "./actaFormSchema";
+import { actaNumberFormatter as fmt, formatActaDate } from "./actaUi";
 
 interface ProduccionRowProps {
   index: number;
@@ -44,45 +35,62 @@ function QuantityStepper({
   onChange: (next: number | undefined) => void;
   hasError?: boolean;
 }) {
+  const stepSx = {
+    width: 36,
+    height: 36,
+    // Dedo, no cursor: en pantallas tactiles el objetivo sube a 44px (minimo de Apple/WCAG).
+    "@media (pointer: coarse)": { width: 44, height: 44 },
+    color: "text.primary",
+    bgcolor: "#FFFFFF",
+    boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06)",
+    "@media (hover: hover) and (pointer: fine)": { "&:hover": { bgcolor: "#FFFFFF", color: designTokens.accent } },
+  };
   return (
     <Stack
       direction="row"
       alignItems="center"
+      gap={0.5}
       sx={{
-        border: "1px solid",
-        borderColor: hasError ? "error.main" : "divider",
-        borderRadius: "10px",
-        height: 40,
-        overflow: "hidden",
-        bgcolor: "background.paper",
+        p: "3px",
+        borderRadius: 999,
+        bgcolor: hasError ? designTokens.status.error.bg : "rgba(15, 23, 42, 0.05)",
+        boxShadow: hasError ? `inset 0 0 0 1px ${designTokens.status.error.fg}` : "none",
+        flexShrink: 0,
       }}
     >
       <IconButton
         size="small"
         onClick={() => onChange(Math.max(0, (value ?? 0) - 1) || undefined)}
-        sx={{ borderRadius: 0, px: 1.25, color: "text.secondary" }}
+        sx={stepSx}
         aria-label="Disminuir cantidad"
       >
         <RemoveIcon fontSize="small" />
       </IconButton>
-      <TextField
-        variant="standard"
+      <Box
+        component="input"
+        inputMode="numeric"
         value={value ?? ""}
         placeholder="0"
-        onChange={(e) => {
+        aria-label="Cantidad"
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           const digits = e.target.value.replace(/\D/g, "");
           onChange(digits === "" ? undefined : Number(digits));
         }}
-        InputProps={{ disableUnderline: true }}
-        inputProps={{ style: { textAlign: "center", ...numericDataSx }, "aria-label": "Cantidad" }}
-        sx={{ width: 52 }}
+        sx={{
+          width: 56,
+          border: "none",
+          outline: "none",
+          bgcolor: "transparent",
+          textAlign: "center",
+          font: "inherit",
+          fontSize: "1.0625rem",
+          fontWeight: 700,
+          fontVariantNumeric: "tabular-nums",
+          color: "text.primary",
+          "&::placeholder": { color: designTokens.textDisabled },
+        }}
       />
-      <IconButton
-        size="small"
-        onClick={() => onChange((value ?? 0) + 1)}
-        sx={{ borderRadius: 0, px: 1.25, color: "text.secondary" }}
-        aria-label="Aumentar cantidad"
-      >
+      <IconButton size="small" onClick={() => onChange((value ?? 0) + 1)} sx={stepSx} aria-label="Aumentar cantidad">
         <AddIcon fontSize="small" />
       </IconButton>
     </Stack>
@@ -119,68 +127,80 @@ export function ProduccionRow({ index, categorias, onRemove, canRemove, open, on
   const subtotal = (values ?? []).reduce((sum, v) => sum + (Number(v?.quantity) || 0), 0);
 
   const produccionErrors = errors.producciones?.[index];
+  const hasErrors = !!produccionErrors;
 
   const usedCategoryIds = (values ?? []).map((v) => v?.categoryId).filter((id): id is number => !!id);
   const lastValue = values?.[values.length - 1];
   const canAddCategory = !lastValue || (!!lastValue.categoryId && !!lastValue.quantity && lastValue.quantity > 0);
+  const contentId = `produccion-${index}-contenido`;
 
   return (
-    <Paper variant="outlined" sx={{ overflow: "hidden" }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        onClick={onToggle}
-        sx={{ p: 2, cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
-      >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box
+    <Box
+      sx={{
+        borderRadius: "16px",
+        bgcolor: open ? "rgba(15, 23, 42, 0.025)" : "transparent",
+        boxShadow: hasErrors
+          ? `inset 0 0 0 1px ${designTokens.status.error.border}`
+          : "inset 0 0 0 1px rgba(15, 23, 42, 0.08)",
+        transition: "background-color 200ms ease",
+      }}
+    >
+      <Stack direction="row" alignItems="center" sx={{ pr: 1 }}>
+        <ButtonBase
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={contentId}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            justifyContent: "flex-start",
+            gap: 1.5,
+            px: 2,
+            py: 1.75,
+            borderRadius: "16px",
+            textAlign: "left",
+          }}
+        >
+          <ExpandMoreIcon
+            fontSize="small"
             sx={{
-              width: 22,
-              height: 22,
-              borderRadius: "7px",
-              bgcolor: "primary.main",
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "0.6875rem",
-              fontWeight: 800,
-              flexShrink: 0,
+              color: designTokens.textCaption,
+              transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: `transform 200ms ${designTokens.easeOut}`,
             }}
-          >
-            {index + 1}
-          </Box>
-          <Typography variant="h4">Producción {index + 1}</Typography>
-          {!open && (
-            <Typography variant="body2" color="text.secondary">
-              {productionDate || "sin fecha"} · subtotal:{" "}
-              <Box component="span" sx={numericDataSx}>
-                {subtotal}
-              </Box>
+          />
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: "0.9375rem" }}>
+              Producción {index + 1}
             </Typography>
-          )}
-        </Stack>
-        <Stack direction="row" spacing={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
-          <Tooltip title={canRemove ? "Quitar esta producción" : "El acta necesita al menos una"}>
-            <span>
-              <IconButton size="small" onClick={onRemove} disabled={!canRemove}>
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <IconButton size="small" onClick={onToggle} aria-label={open ? "Colapsar producción" : "Expandir producción"}>
-            <ExpandMoreIcon
-              fontSize="small"
-              sx={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
-            />
-          </IconButton>
-        </Stack>
+            <Typography variant="body2" noWrap sx={{ fontVariantNumeric: "tabular-nums" }}>
+              {productionDate ? formatActaDate(productionDate) : "Sin fecha"}
+              {hasErrors && (
+                <Box component="span" sx={{ color: designTokens.status.error.fg, fontWeight: 600, ml: 1 }}>
+                  · Revisa los campos
+                </Box>
+              )}
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: "1.0625rem", color: "text.primary", fontVariantNumeric: "tabular-nums" }}>
+              {fmt.format(subtotal)}
+            </Typography>
+            <Typography variant="caption">subtotal</Typography>
+          </Box>
+        </ButtonBase>
+        <Tooltip title={canRemove ? "Quitar esta producción" : "El acta necesita al menos una"}>
+          <span>
+            <IconButton size="small" onClick={onRemove} disabled={!canRemove} aria-label={`Quitar producción ${index + 1}`}>
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Stack>
 
-      <Collapse in={open}>
-        <Stack spacing={2} sx={{ p: 2.5, pt: 0 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+      <Collapse in={open} id={contentId}>
+        <Stack spacing={2} sx={{ px: 2, pb: 2.25 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <TextField
               label="Fecha de producción"
               type="date"
@@ -188,7 +208,7 @@ export function ProduccionRow({ index, categorias, onRemove, canRemove, open, on
               error={!!produccionErrors?.productionDate}
               helperText={produccionErrors?.productionDate?.message}
               {...register(`producciones.${index}.productionDate`)}
-              sx={{ flex: 1 }}
+              sx={{ flex: 1, "& .MuiOutlinedInput-root": { bgcolor: "#FFFFFF" } }}
             />
             <Controller
               name={`producciones.${index}.declaredTotal`}
@@ -200,113 +220,104 @@ export function ProduccionRow({ index, categorias, onRemove, canRemove, open, on
                   value={field.value ?? ""}
                   onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                   helperText="Lo que dice el papel a mano, si aplica."
-                  sx={{ flex: 1 }}
+                  sx={{ flex: 1, "& .MuiOutlinedInput-root": { bgcolor: "#FFFFFF" } }}
                 />
               )}
             />
           </Stack>
 
-          <Stack spacing={1.25}>
+          <Box>
+            <Typography variant="caption" component="div" sx={{ mb: 1 }}>
+              Categorías
+            </Typography>
             {typeof produccionErrors?.values?.message === "string" && (
-              <Typography variant="caption" color="error">
+              <Typography variant="caption" color="error" component="div" sx={{ mb: 1 }}>
                 {produccionErrors.values.message}
               </Typography>
             )}
 
-            {fields.map((field, valueIndex) => {
-              const valueError = produccionErrors?.values?.[valueIndex];
-              const currentCategoryId = values?.[valueIndex]?.categoryId;
-              const availableCategorias = categorias.filter(
-                (cat) => cat.id === currentCategoryId || !usedCategoryIds.includes(cat.id)
-              );
-              return (
-                <Stack key={field.id} direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
-                  <Controller
-                    name={`producciones.${index}.values.${valueIndex}.categoryId`}
-                    control={control}
-                    render={({ field: catField }) => (
-                      <TextField
-                        select
-                        label="Categoría"
-                        value={catField.value || ""}
-                        onChange={(e) => catField.onChange(Number(e.target.value))}
-                        error={!!valueError?.categoryId}
-                        helperText={valueError?.categoryId?.message}
-                        sx={{ flex: 1.5, minWidth: 180 }}
-                      >
-                        <MenuItem value="" disabled>
-                          Selecciona
-                        </MenuItem>
-                        {availableCategorias.map((cat) => (
-                          <MenuItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    )}
-                  />
+            <Stack spacing={{ xs: 1.5, sm: 1 }}>
+              {fields.map((field, valueIndex) => {
+                const valueError = produccionErrors?.values?.[valueIndex];
+                const currentCategoryId = values?.[valueIndex]?.categoryId;
+                const availableCategorias = categorias.filter(
+                  (cat) => cat.id === currentCategoryId || !usedCategoryIds.includes(cat.id)
+                );
+                return (
+                  <Box key={field.id}>
+                    <Stack direction="row" gap={1.25} alignItems="center" flexWrap={{ xs: "wrap", sm: "nowrap" }}>
+                      <Controller
+                        name={`producciones.${index}.values.${valueIndex}.categoryId`}
+                        control={control}
+                        render={({ field: catField }) => (
+                          <TextField
+                            select
+                            aria-label="Categoría"
+                            value={catField.value || ""}
+                            onChange={(e) => catField.onChange(Number(e.target.value))}
+                            error={!!valueError?.categoryId}
+                            SelectProps={{ displayEmpty: true }}
+                            sx={{ flex: 1, minWidth: { xs: "100%", sm: 180 }, "& .MuiOutlinedInput-root": { bgcolor: "#FFFFFF" } }}
+                          >
+                            <MenuItem value="" disabled>
+                              Elige una categoría
+                            </MenuItem>
+                            {availableCategorias.map((cat) => (
+                              <MenuItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        )}
+                      />
 
-                  <Stack spacing={0.5}>
-                    <Controller
-                      name={`producciones.${index}.values.${valueIndex}.quantity`}
-                      control={control}
-                      render={({ field: qtyField }) => (
-                        <QuantityStepper
-                          value={qtyField.value}
-                          onChange={qtyField.onChange}
-                          hasError={!!valueError?.quantity}
-                        />
-                      )}
-                    />
-                    {valueError?.quantity?.message && (
-                      <Typography variant="caption" color="error">
-                        {valueError.quantity.message}
+                      <Controller
+                        name={`producciones.${index}.values.${valueIndex}.quantity`}
+                        control={control}
+                        render={({ field: qtyField }) => (
+                          <QuantityStepper value={qtyField.value} onChange={qtyField.onChange} hasError={!!valueError?.quantity} />
+                        )}
+                      />
+
+                      <Tooltip title="Quitar categoría">
+                        <Box component="span" sx={{ ml: { xs: "auto", sm: 0 } }}>
+                          <IconButton
+                            size="small"
+                            aria-label="Quitar categoría"
+                            onClick={() => remove(valueIndex)}
+                            disabled={fields.length <= 1}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                    </Stack>
+                    {(valueError?.categoryId?.message || valueError?.quantity?.message) && (
+                      <Typography variant="caption" color="error" component="div" sx={{ mt: 0.5 }}>
+                        {valueError?.categoryId?.message ?? valueError?.quantity?.message}
                       </Typography>
                     )}
-                  </Stack>
+                  </Box>
+                );
+              })}
+            </Stack>
 
-                  <Tooltip title="Quitar categoría">
-                    <span>
-                      <IconButton
-                        size="small"
-                        onClick={() => remove(valueIndex)}
-                        disabled={fields.length <= 1}
-                      >
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Stack>
-              );
-            })}
-
-            <Box>
-              <Tooltip title={canAddCategory ? "" : "Completa la categoría y cantidad anteriores primero"}>
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={() => append({ categoryId: 0, quantity: undefined })}
-                    disabled={!canAddCategory}
-                    sx={{ border: "1px dashed", borderColor: "divider" }}
-                  >
-                    <AddIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                Agregar categoría
-              </Typography>
-            </Box>
-          </Stack>
-
-          <Typography variant="body2" color="text.secondary">
-            Vista previa del total (el backend siempre recalcula):{" "}
-            <Box component="span" sx={numericDataSx}>
-              {subtotal}
-            </Box>
-          </Typography>
+            <Tooltip title={canAddCategory ? "" : "Completa la categoría y cantidad anteriores primero"}>
+              <span>
+                <Button
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => append({ categoryId: 0, quantity: undefined })}
+                  disabled={!canAddCategory}
+                  sx={{ mt: 1.25 }}
+                >
+                  Agregar categoría
+                </Button>
+              </span>
+            </Tooltip>
+          </Box>
         </Stack>
       </Collapse>
-    </Paper>
+    </Box>
   );
 }

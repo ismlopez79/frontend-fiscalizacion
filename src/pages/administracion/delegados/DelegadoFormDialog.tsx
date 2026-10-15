@@ -25,9 +25,9 @@ import { DELEGATE_TYPES, DELEGATE_TYPE_LABELS } from "@/types/catalog";
 import type { DelegateDto } from "@/types/catalog";
 
 const schema = z.object({
-  firstName: z.string().min(1, "El nombre es obligatorio"),
-  lastName: z.string().min(1, "El apellido es obligatorio"),
-  internalCode: z.string().optional(),
+  firstName: z.string().min(1, "El nombre es obligatorio").max(100, "Máximo 100 caracteres"),
+  lastName: z.string().min(1, "El apellido es obligatorio").max(100, "Máximo 100 caracteres"),
+  internalCode: z.string().max(50, "Máximo 50 caracteres").optional(),
   dui: z
     .string()
     .min(1, "El DUI es obligatorio")
@@ -249,7 +249,7 @@ export function DelegadoFormDialog({ open, delegado, onClose }: DelegadoFormDial
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

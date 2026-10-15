@@ -22,13 +22,19 @@ import { temporaryDelegateApi } from "@/api/electoralApi";
 import { catalogApi } from "@/api/catalogApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { DUI_HELPER_TEXT, DUI_REGEX, formatDuiInput } from "@/utils/dui";
+import { PHONE_HELPER_TEXT, PHONE_REGEX, formatPhoneInput } from "@/utils/phone";
 import type { ElectoralPeriodDto, TemporaryDelegateDto } from "@/types/electoral";
 
 const schema = z.object({
-  fullName: z.string().min(1, "El nombre completo es obligatorio"),
+  fullName: z.string().min(1, "El nombre completo es obligatorio").max(150, "Máximo 150 caracteres"),
   dui: z.string().min(1, "El DUI es obligatorio").regex(DUI_REGEX, "Formato inválido, debe ser 12345678-9"),
-  email: z.union([z.literal(""), z.string().email("Correo inválido")]),
-  username: z.string().optional(),
+  email: z.union([z.literal(""), z.string().email("Correo inválido").max(150, "Máximo 150 caracteres")]),
+  phone: z.union([z.literal(""), z.string().regex(PHONE_REGEX, "Formato inválido, debe ser 1234-5678")]),
+  username: z
+    .string()
+    .max(50, "Máximo 50 caracteres")
+    .regex(/^[A-Za-z0-9._-]*$/, "Solo letras sin tilde, números, punto, guion y guion bajo")
+    .optional(),
   electoralPeriodId: z.number({ invalid_type_error: "Selecciona un período" }).min(1, "Selecciona un período"),
   active: z.boolean(),
   politicalPartyId: z.number().nullable(),
@@ -70,6 +76,7 @@ export function DelegadoTemporalFormDialog({
       fullName: "",
       dui: "",
       email: "",
+      phone: "",
       username: "",
       electoralPeriodId: 0,
       active: true,
@@ -92,6 +99,7 @@ export function DelegadoTemporalFormDialog({
             fullName: delegado.fullName,
             dui: delegado.dui,
             email: delegado.email ?? "",
+            phone: delegado.phone ?? "",
             username: delegado.username,
             electoralPeriodId: delegado.electoralPeriodId,
             active: delegado.active,
@@ -101,6 +109,7 @@ export function DelegadoTemporalFormDialog({
             fullName: "",
             dui: "",
             email: "",
+            phone: "",
             username: "",
             electoralPeriodId: defaultElectoralPeriodId ?? 0,
             active: true,
@@ -112,12 +121,14 @@ export function DelegadoTemporalFormDialog({
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const email = values.email || undefined;
+      const phone = values.phone || undefined;
       const politicalPartyId = values.politicalPartyId ?? undefined;
       if (isEdit) {
         return temporaryDelegateApi.updateDelegadoTemporal(delegado!.id, {
           fullName: values.fullName,
           dui: values.dui,
           email,
+          phone,
           electoralPeriodId: values.electoralPeriodId,
           active: values.active,
           politicalPartyId,
@@ -127,6 +138,7 @@ export function DelegadoTemporalFormDialog({
         fullName: values.fullName,
         dui: values.dui,
         email,
+        phone,
         username: values.username || undefined,
         electoralPeriodId: values.electoralPeriodId,
         politicalPartyId,
@@ -190,6 +202,22 @@ export function DelegadoTemporalFormDialog({
               error={!!errors.email}
               helperText={errors.email?.message}
               {...register("email")}
+            />
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  label="Teléfono (opcional)"
+                  fullWidth
+                  placeholder="7123-4567"
+                  inputProps={{ inputMode: "numeric", autoComplete: "tel" }}
+                  onChange={(e) => field.onChange(formatPhoneInput(e.target.value))}
+                  error={!!errors.phone}
+                  helperText={errors.phone?.message ?? PHONE_HELPER_TEXT}
+                />
+              )}
             />
 
             {!isEdit && (
@@ -273,7 +301,7 @@ export function DelegadoTemporalFormDialog({
             )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Chip, Collapse, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, Stack, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import { catalogApi } from "@/api/catalogApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
 import { getApiErrorMessage } from "@/utils/apiError";
 import type { IncidentTypeDto } from "@/types/catalog";
 import { TipoIncidenteFormDialog } from "./TipoIncidenteFormDialog";
@@ -45,8 +47,8 @@ export function TiposIncidentePage() {
   const columns: GridColDef<IncidentTypeDto>[] = useMemo(
     () => [
       { field: "displayOrder", headerName: "Orden", width: 90 },
-      { field: "code", headerName: "Código", width: 180 },
-      { field: "name", headerName: "Nombre", flex: 1, minWidth: 200 },
+      { field: "code", headerName: "Código", cellClassName: "cell-code", width: 180 },
+      { field: "name", headerName: "Nombre", cellClassName: "cell-strong", flex: 1, minWidth: 200 },
       {
         field: "description",
         headerName: "Descripción",
@@ -101,39 +103,36 @@ export function TiposIncidentePage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Tipos de incidente</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Catálogo configurable usado al registrar incidentes dentro de un acta. Desactivar no
-            borra el histórico.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
-          Nuevo tipo de incidente
-        </Button>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Tipos de incidente"
+        subtitle="Catálogo configurable usado al registrar incidentes dentro de un acta. Desactivar no borra el histórico."
+        actions={
+          <>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
+              Nuevo tipo de incidente
+            </Button>
+          </>
+        }
+      />
 
       <Collapse in={query.isError}>
-        <Alert severity="error">{getApiErrorMessage(query.error, "No se pudo cargar el catálogo.")}</Alert>
+        <Callout tone="error" title="No se pudo cargar el catálogo">
+          {getApiErrorMessage(query.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
-      <Paper variant="outlined" sx={{ height: 520 }}>
-        <DataGrid
+      <DataTable
           rows={query.data ?? []}
           columns={columns}
           loading={query.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
             sorting: { sortModel: [{ field: "displayOrder", sort: "asc" }] },
           }}
           pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
+          empty={{ title: "Aún no hay tipos de incidente", hint: "Usa el botón de arriba para agregar el primero." }}
         />
-      </Paper>
 
       <TipoIncidenteFormDialog
         open={dialog.type === "create" || dialog.type === "edit"}

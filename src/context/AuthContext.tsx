@@ -1,4 +1,5 @@
 import { createContext, useCallback, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/authApi";
 import { getStoredSession, getStoredToken, setStoredSession, setStoredToken, type StoredSession } from "@/api/client";
 import { isTokenExpired } from "@/utils/jwt";
@@ -11,8 +12,8 @@ import type { AuthUser, LoginRequest, LoginResponse } from "@/types/auth";
  * validado exclusivamente por el backend en cada request.
  *
  * El storage en si (StoredSession, get/setStoredSession) vive en api/client.ts
- * porque el interceptor de 403 MODULE_DISABLED tambien necesita leerlo para
- * saber si el usuario en sesion es DELEGADO_TEMPORAL.
+ * porque el interceptor de respuestas tambien necesita leerlo y limpiarlo
+ * (401 de sesion terminada, 403 PROFILE_INCOMPLETE_REQUIRED).
  */
 interface AuthContextValue {
   user: AuthUser | null;
@@ -26,6 +27,8 @@ interface AuthContextValue {
    * restringido (PASSWORD_CHANGE_ONLY) por el nuevo token FULL.
    */
   applyAuthResponse: (response: LoginResponse) => void;
+  /** Levanta el bloqueo local de perfil incompleto (ver RequireCompleteProfile). */
+  markProfileComplete: () => void;
   logout: () => void;
   hasRole: (role: string) => boolean;
 }
@@ -47,17 +50,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  // El cache de react-query vive en memoria y NO sabe de sesiones: sin
+  // vaciarlo, la siguiente persona que inicia sesion en el mismo navegador
+  // veia por unos segundos datos de la anterior (su foto, "mis actas", su
+  // perfil...) hasta que cada consulta se volvia a pedir. Se vacia al cerrar
+  // sesion y tambien al aplicar una sesion nueva (cubre sesiones que no se
+  // cerraron, p. ej. un token que vencio).
+  const queryClient = useQueryClient();
+
   const applyAuthResponse = useCallback((response: LoginResponse) => {
+    const previous = getStoredSession();
+    // Mismo usuario (p. ej. tras cambiar su contraseña): el cache es suyo, se conserva.
+    if (!previous || previous.username !== response.username) {
+      queryClient.cancelQueries();
+      queryClient.clear();
+    }
     setStoredToken(response.token);
     const newSession = {
       username: response.username,
       fullName: response.fullName,
       roles: response.roles,
       primerIngreso: response.primerIngreso,
+      // Backend viejo sin el campo = no hay bloqueo por perfil.
+      profileComplete: response.profileComplete ?? true,
       scope: response.scope,
     };
     setStoredSession(newSession);
     setSession(newSession);
+  }, [queryClient]);
+
+  /** Tras completar correo, telefono y foto: levanta el bloqueo en la sesion local. */
+  const markProfileComplete = useCallback(() => {
+    setSession((current) => {
+      if (!current) return current;
+      const next = { ...current, profileComplete: true };
+      setStoredSession(next);
+      return next;
+    });
   }, []);
 
   const login = useCallback(
@@ -78,7 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStoredToken(null);
     setStoredSession(null);
     setSession(null);
-  }, []);
+    queryClient.cancelQueries();
+    queryClient.clear();
+  }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -92,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // se completan aqui. Por ahora los guards usan roles.
             permissions: [],
             primerIngreso: session.primerIngreso,
+            profileComplete: session.profileComplete !== false,
             scope: session.scope,
           }
         : null,
@@ -99,10 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login,
       applyAuthResponse,
+      markProfileComplete,
       logout,
       hasRole: (role: string) => session?.roles.includes(role) ?? false,
     }),
-    [session, isLoading, login, applyAuthResponse, logout]
+    [session, isLoading, login, applyAuthResponse, markProfileComplete, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

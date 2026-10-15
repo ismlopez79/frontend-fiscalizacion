@@ -1,31 +1,20 @@
 import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-  Alert,
-  Autocomplete,
-  Box,
-  Button,
-  Collapse,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  IconButton,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Autocomplete, Box, Button, Collapse, Dialog, DialogContent, IconButton, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import type { GridColDef, GridPaginationModel } from "@mui/x-data-grid";
 import dayjs from "dayjs";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import { auditApi } from "@/api/auditApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { AuditActionChip } from "@/components/AuditActionChip";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Surface } from "@/components/ui/Surface";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
+import { DetailRow } from "@/components/ui/DetailRow";
+import { designTokens } from "@/theme/theme";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_NAMES } from "@/types/audit";
 import type { AuditLogDto, AuditLogFilters } from "@/types/audit";
 
@@ -74,6 +63,7 @@ export function AuditoriaPage() {
         headerName: "Fecha",
         width: 170,
         valueGetter: (_value, row) => dayjs(row.createdAt).format("DD/MM/YYYY HH:mm:ss"),
+        cellClassName: "cell-num",
       },
       {
         field: "username",
@@ -125,194 +115,239 @@ export function AuditoriaPage() {
         },
       },
       { field: "ipAddress", headerName: "IP", width: 120, valueGetter: (_v, row) => row.ipAddress ?? "—" },
-      {
-        field: "actions",
-        headerName: "",
-        width: 60,
-        sortable: false,
-        filterable: false,
-        renderCell: (params) => (
-          <Tooltip title="Ver detalle">
-            <IconButton size="small" onClick={() => setDetailRow(params.row)}>
-              <VisibilityOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        ),
-      },
     ],
     []
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Box>
-        <Typography variant="h3">Auditoría</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Consulta de solo lectura sobre el historial de acciones del sistema: logins, altas y
-          cambios de estado de actas, subida de archivos y cambios de usuarios.
-        </Typography>
-      </Box>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Auditoría"
+        subtitle="Consulta de solo lectura sobre el historial de acciones del sistema: logins, altas y cambios de estado de actas, subida de archivos y cambios de usuarios. Toca un evento para ver su detalle."
+      />
 
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              label="Usuario"
-              fullWidth
-              size="small"
-              value={filtersDraft.username ?? ""}
-              onChange={(e) => setFiltersDraft((f) => ({ ...f, username: e.target.value || undefined }))}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <Autocomplete
-              freeSolo
-              options={AUDIT_ENTITY_NAMES}
-              value={filtersDraft.entityName ?? ""}
-              onInputChange={(_e, value) =>
-                setFiltersDraft((f) => ({ ...f, entityName: value || undefined }))
-              }
-              renderInput={(params) => (
-                <TextField {...params} label="Entidad" size="small" placeholder="ACTA, USER..." />
-              )}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={1.5}>
-            <TextField
-              label="Id de entidad"
-              type="number"
-              fullWidth
-              size="small"
-              value={filtersDraft.entityId ?? ""}
-              onChange={(e) =>
-                setFiltersDraft((f) => ({
-                  ...f,
-                  entityId: e.target.value === "" ? undefined : Number(e.target.value),
-                }))
-              }
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              select
-              label="Acción"
-              fullWidth
-              size="small"
-              value={filtersDraft.action ?? ""}
-              onChange={(e) => setFiltersDraft((f) => ({ ...f, action: e.target.value || undefined }))}
-            >
-              <MenuItem value="">Todas</MenuItem>
-              {AUDIT_ACTIONS.map((action) => (
-                <MenuItem key={action} value={action}>
-                  {action}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              label="Desde"
-              type="datetime-local"
-              fullWidth
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={filtersDraft.from ?? ""}
-              onChange={(e) => setFiltersDraft((f) => ({ ...f, from: e.target.value || undefined }))}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              label="Hasta"
-              type="datetime-local"
-              fullWidth
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={filtersDraft.to ?? ""}
-              onChange={(e) => setFiltersDraft((f) => ({ ...f, to: e.target.value || undefined }))}
-            />
-          </Grid>
-        </Grid>
-
-        <Stack direction="row" spacing={1.5} sx={{ mt: 2 }}>
-          <Button variant="contained" onClick={applyFilters}>
-            Filtrar
-          </Button>
-          <Button
-            variant="text"
-            color="inherit"
-            startIcon={<FilterAltOffOutlinedIcon />}
-            onClick={clearFilters}
-            disabled={!hasActiveFilters && Object.values(filtersDraft).every((v) => !v)}
+      <Surface>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyFilters();
+          }}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(6, minmax(0, 1fr))" },
+            gap: 2,
+          }}
+        >
+          <TextField
+            label="Usuario"
+            fullWidth
+            size="small"
+            value={filtersDraft.username ?? ""}
+            onChange={(e) => setFiltersDraft((f) => ({ ...f, username: e.target.value || undefined }))}
+          />
+          <Autocomplete
+            freeSolo
+            options={AUDIT_ENTITY_NAMES}
+            value={filtersDraft.entityName ?? ""}
+            onInputChange={(_e, value) => setFiltersDraft((f) => ({ ...f, entityName: value || undefined }))}
+            renderInput={(params) => <TextField {...params} label="Entidad" size="small" placeholder="ACTA, USER..." />}
+          />
+          <TextField
+            label="Id de entidad"
+            type="number"
+            fullWidth
+            size="small"
+            value={filtersDraft.entityId ?? ""}
+            onChange={(e) =>
+              setFiltersDraft((f) => ({
+                ...f,
+                entityId: e.target.value === "" ? undefined : Number(e.target.value),
+              }))
+            }
+          />
+          <TextField
+            select
+            label="Acción"
+            fullWidth
+            size="small"
+            value={filtersDraft.action ?? ""}
+            onChange={(e) => setFiltersDraft((f) => ({ ...f, action: e.target.value || undefined }))}
           >
-            Limpiar filtros
-          </Button>
-        </Stack>
-      </Paper>
+            <MenuItem value="">Todas</MenuItem>
+            {AUDIT_ACTIONS.map((action) => (
+              <MenuItem key={action} value={action}>
+                {action}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Desde"
+            type="datetime-local"
+            fullWidth
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={filtersDraft.from ?? ""}
+            onChange={(e) => setFiltersDraft((f) => ({ ...f, from: e.target.value || undefined }))}
+            sx={{ "& input": { fontVariantNumeric: "tabular-nums" } }}
+          />
+          <TextField
+            label="Hasta"
+            type="datetime-local"
+            fullWidth
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={filtersDraft.to ?? ""}
+            onChange={(e) => setFiltersDraft((f) => ({ ...f, to: e.target.value || undefined }))}
+            sx={{ "& input": { fontVariantNumeric: "tabular-nums" } }}
+          />
 
-      {logsQuery.isError && (
-        <Alert severity="error">
-          {getApiErrorMessage(logsQuery.error, "No se pudo cargar la auditoría.")}
-        </Alert>
-      )}
+          <Stack
+            direction="row"
+            gap={1.25}
+            justifyContent="flex-end"
+            sx={{ gridColumn: "1 / -1" }}
+          >
+            <Button
+              color="inherit"
+              startIcon={<FilterAltOffOutlinedIcon />}
+              onClick={clearFilters}
+              disabled={!hasActiveFilters && Object.values(filtersDraft).every((v) => !v)}
+            >
+              Limpiar filtros
+            </Button>
+            <Button type="submit" variant="contained">
+              Filtrar
+            </Button>
+          </Stack>
+        </Box>
+      </Surface>
 
-      <Paper variant="outlined" sx={{ height: 600 }}>
-        <DataGrid
-          rows={logsQuery.data?.content ?? []}
-          columns={columns}
-          loading={logsQuery.isFetching}
-          disableRowSelectionOnClick
-          density="comfortable"
-          paginationMode="server"
-          rowCount={logsQuery.data?.totalElements ?? 0}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 30, 50, 100]}
-          sortingMode="client"
-          sx={{ border: "none" }}
-        />
-      </Paper>
+      <Collapse in={logsQuery.isError}>
+        <Callout tone="error" title="No se pudo cargar la auditoría">
+          {getApiErrorMessage(logsQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
+      </Collapse>
+
+      <DataTable
+        rows={logsQuery.data?.content ?? []}
+        columns={columns}
+        loading={logsQuery.isFetching}
+        getRowHeight={() => "auto"}
+        paginationMode="server"
+        rowCount={logsQuery.data?.totalElements ?? 0}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        pageSizeOptions={[15, 30, 50, 100]}
+        sortingMode="client"
+        clickableRows
+        onRowClick={(params) => setDetailRow(params.row)}
+        onCellKeyDown={(params, event) => {
+          if (event.key === "Enter") setDetailRow(params.row);
+        }}
+        empty={
+          hasActiveFilters
+            ? { title: "Ningún evento coincide", hint: "Amplía el rango de fechas o limpia los filtros." }
+            : { title: "Sin eventos registrados" }
+        }
+        sx={{ "& .MuiDataGrid-cell": { py: 1 } }}
+      />
 
       <Dialog open={!!detailRow} onClose={() => setDetailRow(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Detalle del evento #{detailRow?.id}</DialogTitle>
-        <DialogContent>
-          {detailRow && (
-            <Stack spacing={1.5} sx={{ pb: 1 }}>
-              <DetailRow label="Fecha" value={dayjs(detailRow.createdAt).format("DD/MM/YYYY HH:mm:ss")} />
-              <DetailRow label="Usuario" value={detailRow.username} />
-              <DetailRow label="Nombre completo" value={detailRow.fullName || "—"} />
-              <DetailRow label="Acción" value={detailRow.action} />
-              <DetailRow
-                label="Entidad"
-                value={
-                  detailRow.entityId !== null
-                    ? `${detailRow.entityName} #${detailRow.entityId}`
-                    : detailRow.entityName
-                }
-              />
-              <DetailRow label="Campo" value={detailRow.fieldName ?? "—"} />
-              <DetailRow label="Valor anterior" value={detailRow.oldValue ?? "—"} />
-              <DetailRow label="Valor nuevo" value={detailRow.newValue ?? "—"} />
-              <DetailRow label="IP" value={detailRow.ipAddress ?? "—"} />
-              <Collapse in={!!detailRow.extraInfo}>
-                <DetailRow label="Info adicional" value={detailRow.extraInfo ?? "—"} multiline />
-              </Collapse>
+        {detailRow && (
+          <>
+            <Stack direction="row" alignItems="center" gap={1.5} sx={{ px: 3, pt: 2.5, pb: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: "1.125rem", letterSpacing: "-0.015em" }}>
+                  Evento #{detailRow.id}
+                </Typography>
+                <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                  {dayjs(detailRow.createdAt).format("DD/MM/YYYY HH:mm:ss")}
+                </Typography>
+              </Box>
+              <AuditActionChip action={detailRow.action} />
+              <IconButton size="small" aria-label="Cerrar detalle" onClick={() => setDetailRow(null)}>
+                <CloseRoundedIcon fontSize="small" />
+              </IconButton>
             </Stack>
-          )}
-        </DialogContent>
+            <DialogContent>
+              <Box component="dl" sx={{ m: 0, display: "grid", gap: 1.5 }}>
+                <DetailRow label="Usuario" value={detailRow.username} />
+                <DetailRow label="Nombre completo" value={detailRow.fullName || null} />
+                <DetailRow
+                  label="Entidad"
+                  value={detailRow.entityId !== null ? `${detailRow.entityName} #${detailRow.entityId}` : detailRow.entityName}
+                />
+                <DetailRow label="Campo" value={detailRow.fieldName} />
+                <DetailRow label="IP" value={detailRow.ipAddress} numeric />
+              </Box>
+
+              {(detailRow.oldValue || detailRow.newValue) && (
+                <Box
+                  sx={{
+                    mt: 2.5,
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", sm: "1fr auto 1fr" },
+                    gap: 1.25,
+                    alignItems: "stretch",
+                  }}
+                >
+                  <ValueBox label="Valor anterior" value={detailRow.oldValue} tone="old" />
+                  <Stack alignItems="center" justifyContent="center" sx={{ color: designTokens.textCaption }}>
+                    <ArrowForwardRoundedIcon fontSize="small" sx={{ transform: { xs: "rotate(90deg)", sm: "none" } }} />
+                  </Stack>
+                  <ValueBox label="Valor nuevo" value={detailRow.newValue} tone="new" />
+                </Box>
+              )}
+
+              {detailRow.extraInfo && (
+                <Box sx={{ mt: 2.5 }}>
+                  <Typography variant="body2" sx={{ color: designTokens.textCaption, mb: 0.5 }}>
+                    Info adicional
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "text.primary", whiteSpace: "pre-wrap", wordBreak: "break-word", p: 1.5, borderRadius: "12px", bgcolor: "rgba(15, 23, 42, 0.03)" }}
+                  >
+                    {detailRow.extraInfo}
+                  </Typography>
+                </Box>
+              )}
+            </DialogContent>
+          </>
+        )}
       </Dialog>
     </Stack>
   );
 }
 
-function DetailRow({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {
+/** Caja del antes/despues de un cambio: el anterior en tono neutro, el nuevo tintado. */
+function ValueBox({ label, value, tone }: { label: string; value: string | null; tone: "old" | "new" }) {
   return (
-    <Stack direction={multiline ? "column" : "row"} spacing={multiline ? 0.5 : 1}>
-      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 140, fontWeight: 600 }}>
+    <Box
+      sx={{
+        p: 1.5,
+        borderRadius: "12px",
+        bgcolor: tone === "new" ? designTokens.accentSoft : "rgba(15, 23, 42, 0.03)",
+        minWidth: 0,
+      }}
+    >
+      <Typography variant="caption" component="div">
         {label}
       </Typography>
-      <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-        {value}
+      <Typography
+        variant="body2"
+        sx={{
+          mt: 0.25,
+          color: value ? "text.primary" : designTokens.textDisabled,
+          fontWeight: 600,
+          wordBreak: "break-word",
+          textDecoration: tone === "old" && value ? "line-through" : "none",
+          textDecorationColor: "rgba(15, 23, 42, 0.3)",
+        }}
+      >
+        {value ?? "Vacío"}
       </Typography>
-    </Stack>
+    </Box>
   );
 }

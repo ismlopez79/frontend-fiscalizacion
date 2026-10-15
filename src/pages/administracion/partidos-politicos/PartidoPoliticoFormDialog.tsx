@@ -24,7 +24,7 @@ import type { PoliticalPartyDto } from "@/types/catalog";
 
 const schema = z.object({
   code: z.string().min(1, "El código es obligatorio").max(20, "Máximo 20 caracteres"),
-  name: z.string().min(1, "El nombre es obligatorio"),
+  name: z.string().min(1, "El nombre es obligatorio").max(120, "Máximo 120 caracteres"),
   active: z.boolean(),
 });
 
@@ -111,7 +111,7 @@ export function PartidoPoliticoFormDialog({ open, partido, onClose }: PartidoPol
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

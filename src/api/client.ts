@@ -30,21 +30,28 @@ export function setStoredToken(token: string | null): void {
 
 /**
  * Sesion liviana (roles, etc.) guardada junto al token. Vive aqui (no en
- * AuthContext) porque el interceptor de abajo necesita leer el rol del
- * usuario para decidir si un 403 MODULE_DISABLED debe forzar el logout de un
- * delegado temporal — AuthContext es quien la escribe (applyAuthResponse) y
- * lee para poblar su estado de React, pero el storage en si es de este
- * modulo para evitar un import circular entre ambos.
+ * AuthContext) porque el interceptor de abajo necesita limpiarla en un 401
+ * y marcarla en un 403 PROFILE_INCOMPLETE_REQUIRED — AuthContext es quien la
+ * escribe (applyAuthResponse) y lee para poblar su estado de React, pero el
+ * storage en si es de este modulo para evitar un import circular entre ambos.
  */
 export interface StoredSession {
   username: string;
   fullName: string;
   roles: string[];
   primerIngreso: boolean;
+  /** Ausente en sesiones guardadas antes de este campo: se trata como true. */
+  profileComplete?: boolean;
   scope: AuthScope;
 }
 
 const SESSION_STORAGE_KEY = "jve_auth_session";
+
+/**
+ * Donde se completa el perfil obligatorio (correo, telefono y foto): la misma
+ * pantalla "Mi cuenta", que ya permite editar todo eso. No hay pantalla aparte.
+ */
+export const COMPLETE_PROFILE_PATH = "/perfil";
 
 export function getStoredSession(): StoredSession | null {
   const raw = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -91,26 +98,34 @@ apiClient.interceptors.request.use((config) => {
  * y forzamos vuelta a login. El componente de rutas protegidas se encarga
  * de recordar a donde queria ir el usuario para volver ahi tras loguearse.
  *
- * Excepcion: POST /auth/change-password tambien responde 401 cuando el
- * "currentPassword" enviado no coincide (caso B, cambio voluntario) — ahi no
- * es una sesion vencida, es un error de formulario que la propia pantalla
- * debe mostrar, sin destruir un token FULL valido en el proceso.
+ * Excepcion: POST /auth/change-password tambien responde 401
+ * INVALID_CREDENTIALS cuando el "currentPassword" enviado no coincide (caso
+ * B, cambio voluntario) — ahi no es una sesion vencida, es un error de
+ * formulario que la propia pantalla debe mostrar, sin destruir un token FULL
+ * valido en el proceso. Cualquier otro 401 de esa ruta (SESSION_EXPIRED,
+ * token vencido) si es sesion terminada.
  *
- * 403 MODULE_DISABLED (modulo de Elecciones apagado): solo forzamos logout
- * si el usuario en sesion es DELEGADO_TEMPORAL — su cuenta deja de ser
- * valida mientras el modulo este apagado, incluso a mitad de sesion (ver
- * seccion 4.4 del prompt). Un delegado permanente (DIGITADOR/SUPERVISOR/
- * ADMINISTRADOR) que pierde FORM_* sigue con sesion valida para todo lo
- * demas (Actas/Duicentros, preparar la proxima eleccion, etc.), asi que ahi
- * NO se cierra sesion: la pantalla que hizo el request ya muestra el
- * mensaje del backend (data.message) via su manejo de error existente.
+ * Modulo de Elecciones apagado: a un DELEGADO_TEMPORAL el backend le
+ * responde 401 SESSION_EXPIRED en cualquier ruta, asi que sale por este
+ * mismo camino. Un usuario permanente que recibe 403 MODULE_DISABLED sigue
+ * con sesion valida: la pantalla que hizo el request muestra el mensaje.
  */
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const isChangePasswordCall = error.config?.url?.includes("/auth/change-password");
-    if (error.response?.status === 401 && !isChangePasswordCall) {
+    const data = error.response?.data as Partial<ApiErrorResponse> | undefined;
+    const errorCode = data?.code ?? data?.error;
+    const isWrongCurrentPassword =
+      error.config?.url?.includes("/auth/change-password") && errorCode === "INVALID_CREDENTIALS";
+    // El 401 del propio login es "credenciales invalidas", no una sesion
+    // terminada: lo muestra LoginPage.
+    const isLoginCall = error.config?.url?.includes("/auth/login");
+    if (error.response?.status === 401 && !isWrongCurrentPassword && !isLoginCall) {
+      // Sesion terminada (token vencido, invalidado porque la contraseña de
+      // la cuenta se cambio/restablecio, o delegado temporal con el modulo de
+      // Elecciones apagado): se limpia TODO, token y sesion.
       setStoredToken(null);
+      setStoredSession(null);
       const currentPath = window.location.pathname + window.location.search;
       if (!window.location.pathname.startsWith("/login")) {
         window.location.href = `/login?redirectTo=${encodeURIComponent(currentPath)}`;
@@ -118,19 +133,17 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const data = error.response?.data as Partial<ApiErrorResponse> | undefined;
-    const errorCode = data?.code ?? data?.error;
-    if (error.response?.status === 403 && errorCode === "MODULE_DISABLED") {
+    // 403 PROFILE_INCOMPLETE_REQUIRED: al usuario le falta correo, telefono o
+    // foto. El backend lo re-evalua en cada request, asi que puede llegar a
+    // mitad de una sesion ya abierta (p. ej. un admin le borro el telefono).
+    // Se marca la sesion y se lleva a la persona a completar su perfil; desde
+    // ahi solo se llaman los endpoints .../me, que el backend si permite.
+    if (error.response?.status === 403 && errorCode === "PROFILE_INCOMPLETE_REQUIRED") {
       const session = getStoredSession();
-      const isTemporaryDelegate = session?.roles.includes("DELEGADO_TEMPORAL") ?? false;
-      if (isTemporaryDelegate) {
-        setStoredToken(null);
-        setStoredSession(null);
-        if (!window.location.pathname.startsWith("/login")) {
-          const params = new URLSearchParams();
-          if (data?.message) params.set("moduleDisabledMessage", data.message);
-          window.location.href = `/login?${params.toString()}`;
-        }
+      if (session) setStoredSession({ ...session, profileComplete: false });
+      if (!window.location.pathname.startsWith(COMPLETE_PROFILE_PATH)) {
+        const currentPath = window.location.pathname + window.location.search;
+        window.location.href = `${COMPLETE_PROFILE_PATH}?redirectTo=${encodeURIComponent(currentPath)}`;
       }
     }
 

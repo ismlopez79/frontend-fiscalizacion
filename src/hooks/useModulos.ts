@@ -22,5 +22,9 @@ export function useModulos() {
   const electionsModule = query.data?.find((m) => m.code === "ELECTIONS") ?? null;
   const isElectionsEnabled = electionsModule?.enabled ?? true;
 
-  return { ...query, modules: query.data ?? [], electionsModule, isElectionsEnabled };
+  // Modo practica (actas simuladas que no se guardan): viene apagado y es una
+  // opcion extra, no algo que se quita — mientras carga se asume apagado.
+  const isTrainingEnabled = query.data?.find((m) => m.code === "TRAINING")?.enabled ?? false;
+
+  return { ...query, modules: query.data ?? [], electionsModule, isElectionsEnabled, isTrainingEnabled };
 }

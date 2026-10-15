@@ -10,7 +10,7 @@ import type { ElectoralPeriodDto } from "@/types/electoral";
 
 const schema = z
   .object({
-    name: z.string().min(1, "El nombre es obligatorio"),
+    name: z.string().min(1, "El nombre es obligatorio").max(150, "Máximo 150 caracteres"),
     code: z
       .string()
       .min(1, "El código es obligatorio")
@@ -126,7 +126,7 @@ export function PeriodoElectoralFormDialog({ open, periodo, onClose }: PeriodoEl
             </Stack>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

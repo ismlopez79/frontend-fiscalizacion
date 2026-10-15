@@ -1,4 +1,5 @@
 import type { SvgIconComponent } from "@mui/icons-material";
+import GridViewIcon from "@mui/icons-material/GridViewOutlined";
 import DashboardIcon from "@mui/icons-material/DashboardOutlined";
 import DescriptionIcon from "@mui/icons-material/DescriptionOutlined";
 import FactCheckIcon from "@mui/icons-material/FactCheckOutlined";
@@ -21,6 +22,8 @@ import QuizIcon from "@mui/icons-material/QuizOutlined";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedInOutlined";
 import ExtensionIcon from "@mui/icons-material/ExtensionOutlined";
 import FlagIcon from "@mui/icons-material/FlagOutlined";
+import SchoolIcon from "@mui/icons-material/SchoolOutlined";
+import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccountOutlined";
 
 export interface NavItem {
   label: string;
@@ -38,29 +41,49 @@ export interface NavItem {
    * con el modulo apagado.
    */
   requiresElectionsModule?: boolean;
+  /** Si es true, el item solo se muestra cuando GET /modulos reporta TRAINING (modo practica) encendido. */
+  requiresTrainingModule?: boolean;
   children?: NavItem[];
 }
 
 /**
- * Configuracion unica de navegacion. Se filtra por rol al renderizar el
+ * Configuracion unica de navegacion: secciones (General, Administración,
+ * Elecciones) con sus pantallas. Se filtra por rol al renderizar el
  * sidebar, para que un DIGITADOR nunca vea enlaces a modulos que no puede
  * usar (ver seccion 4.2 del prompt de frontend).
  */
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", path: "/dashboard", icon: DashboardIcon },
-  { label: "Actas", path: "/actas", icon: DescriptionIcon },
   {
-    label: "Actas pendientes",
-    path: "/actas/pendientes",
-    icon: FactCheckIcon,
-    allowedRoles: ["SUPERVISOR", "ADMINISTRADOR"],
-  },
-  {
-    label: "Reportes",
-    path: "/reportes",
-    icon: AssessmentIcon,
-    // Permiso REPORT_EXPORT del backend, sembrado solo para estos dos roles.
-    allowedRoles: ["ADMINISTRADOR", "SUPERVISOR"],
+    // Seccion del dia a dia. Su path no es una ruta: solo identifica al grupo
+    // en el sidebar (que seccion esta abierta).
+    label: "General",
+    path: "/general",
+    icon: GridViewIcon,
+    children: [
+      { label: "Dashboard", path: "/dashboard", icon: DashboardIcon },
+      { label: "Actas", path: "/actas", icon: DescriptionIcon },
+      {
+        label: "Acta de práctica",
+        path: "/actas/practica",
+        icon: SchoolIcon,
+        // Quienes tienen permiso de crear actas (POST /practica/actas exige el mismo).
+        allowedRoles: ["DIGITADOR", "DELEGADO_TEMPORAL", "ADMINISTRADOR"],
+        requiresTrainingModule: true,
+      },
+      {
+        label: "Actas pendientes",
+        path: "/actas/pendientes",
+        icon: FactCheckIcon,
+        allowedRoles: ["SUPERVISOR", "ADMINISTRADOR"],
+      },
+      {
+        label: "Reportes",
+        path: "/reportes",
+        icon: AssessmentIcon,
+        // Permiso REPORT_EXPORT del backend, sembrado solo para estos dos roles.
+        allowedRoles: ["ADMINISTRADOR", "SUPERVISOR"],
+      },
+    ],
   },
   {
     label: "Administración",
@@ -143,6 +166,13 @@ export const NAV_ITEMS: NavItem[] = [
         label: "Asignaciones",
         path: "/elecciones/asignaciones",
         icon: EventAvailableIcon,
+        allowedRoles: ["ADMINISTRADOR"],
+      },
+      {
+        label: "Temporales a cargo",
+        path: "/elecciones/temporales-a-cargo",
+        icon: SupervisorAccountIcon,
+        // Permiso ASSIGNMENT_MANAGE del backend, igual que "Asignaciones".
         allowedRoles: ["ADMINISTRADOR"],
       },
       {

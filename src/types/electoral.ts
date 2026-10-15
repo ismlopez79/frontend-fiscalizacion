@@ -21,6 +21,8 @@ export interface TemporaryDelegateDto {
   fullName: string;
   dui: string;
   email: string | null;
+  /** Opcional (V31), formato 1234-5678. Null si no se ha capturado. */
+  phone: string | null;
   electoralPeriodId: number;
   electoralPeriodName: string;
   active: boolean;
@@ -43,6 +45,8 @@ export interface CreateTemporaryDelegateRequest {
   /** Requerido, formato 12345678-9. Unico cruzando esta tabla y /usuarios. */
   dui: string;
   email?: string;
+  /** Opcional, formato 1234-5678. */
+  phone?: string;
   /** Opcional — si se omite, el backend lo deriva del dui. */
   username?: string;
   electoralPeriodId: number;
@@ -55,6 +59,8 @@ export interface UpdateTemporaryDelegateRequest {
   fullName: string;
   dui: string;
   email?: string;
+  /** Opcional, formato 1234-5678. */
+  phone?: string;
   electoralPeriodId: number;
   active: boolean;
   /** Obligatorio en la practica: el backend responde 400 VALIDATION_ERROR si se omite. */
@@ -128,6 +134,29 @@ export interface CreateAssignmentRequest {
 export interface UpdateAssignmentRequest {
   serviceCenterId: number;
   assignmentDate: string;
+}
+
+/**
+ * Delegado temporal a cargo de un delegado permanente (usuario DIGITADOR).
+ * El permanente solo puede registrar como acompañantes de su acta a los
+ * temporales que tiene a cargo. Un temporal puede estar a cargo de mas de un
+ * permanente a la vez.
+ */
+export interface TraineeAssignmentDto {
+  id: number;
+  userId: number;
+  userFullName: string;
+  temporaryDelegateId: number;
+  temporaryDelegateName: string;
+  temporaryDelegateDui: string;
+  politicalPartyName: string | null;
+  active: boolean;
+}
+
+/** 409 si el usuario no es DIGITADOR, si el temporal esta inactivo o si ya lo tiene a cargo. */
+export interface CreateTraineeAssignmentRequest {
+  userId: number;
+  temporaryDelegateId: number;
 }
 
 export type FiscalizationAnswerType = "SI_NO" | "SI_NO_PARCIAL" | "TEXTO_LIBRE";

@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { OBSERVATIONS_MIN_WORDS, countWords, missingWordsMessage } from "@/utils/words";
 import type { ProductionCategoryDto } from "@/types/catalog";
-import type { ActaDraftContent, ActaDraftSnapshot } from "@/types/acta";
+import type { ActaDraftContent, ActaDraftSnapshot, ActaResponse } from "@/types/acta";
 
 const valueSchema = z.object({
   categoryId: z.number().min(1, "Selecciona una categoría"),
@@ -41,7 +42,7 @@ const produccionSchema = z
 
 const incidenteSchema = z.object({
   incidentTypeId: z.number().min(1, "Selecciona un tipo de incidente"),
-  description: z.string().min(1, "La descripción es obligatoria"),
+  description: z.string().min(1, "La descripción es obligatoria").max(2000, "Máximo 2000 caracteres"),
 });
 
 // El filtro en tiempo real del <select> (ver IncidenteRow) ya evita elegir
@@ -60,6 +61,12 @@ const incidentesArraySchema = z.array(incidenteSchema).superRefine((incidentes, 
   });
 });
 
+// Regla compartida con el formulario de fiscalizacion (ver utils/words.ts).
+export { OBSERVATIONS_MIN_WORDS, countWords } from "@/utils/words";
+
+/** Tope del backend por acta. */
+export const MAX_ACOMPANANTES = 30;
+
 export const actaFormSchema = z.object({
   departmentId: z.number().min(1, "Selecciona un departamento"),
   duicentroId: z.number().min(1, "Selecciona un duicentro"),
@@ -67,15 +74,32 @@ export const actaFormSchema = z.object({
   arrivalTime: z.string().optional(),
   departureTime: z.string().optional(),
   jveDelegateId: z.number().optional(),
-  rnpnDelegateName: z.string().optional(),
-  duicentroChiefName: z.string().optional(),
-  observations: z.string().optional(),
+  rnpnDelegateName: z.string().max(200, "Máximo 200 caracteres").optional(),
+  duicentroChiefName: z.string().max(200, "Máximo 200 caracteres").optional(),
+  observations: z
+    .string()
+    .optional()
+    .superRefine((value, ctx) => {
+      if ((value ?? "").length > 5000) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Máximo 5000 caracteres" });
+        return;
+      }
+      const words = countWords(value);
+      if (words < OBSERVATIONS_MIN_WORDS) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: missingWordsMessage(words),
+        });
+      }
+    }),
   declaredTotal: z.number().optional(),
   producciones: z.array(produccionSchema).min(1, "Agrega al menos una producción"),
   // Opcional: el acta puede no tener ningun incidente (defaultValues arranca
   // en []). Cada fila que exista si exige ambos campos (misma regla que
   // produccionSchema.values), y no puede repetir el tipo de otra fila.
   incidentes: incidentesArraySchema,
+  // Opcional: delegados temporales a cargo que acompañaron al permanente.
+  acompananteIds: z.array(z.number()).max(MAX_ACOMPANANTES, `Máximo ${MAX_ACOMPANANTES} acompañantes por acta`),
 });
 
 export type ActaFormValues = z.infer<typeof actaFormSchema>;
@@ -164,6 +188,7 @@ export function buildDraftContent(values: ActaFormValues, opts: DraftMappingOpti
       incidentTypeId: i.incidentTypeId,
       description: i.description,
     })),
+    acompananteIds: values.acompananteIds ?? [],
   };
 }
 
@@ -174,6 +199,40 @@ export function buildDraftSnapshot(values: ActaFormValues, opts: DraftMappingOpt
     duicentroId: values.duicentroId,
     actaDate: values.actaDate,
     content: buildDraftContent(values, opts),
+  };
+}
+
+/**
+ * Valores del formulario a partir de un acta ya registrada, para corregirla
+ * (PUT /actas/{id}). La respuesta trae el delegado JVE solo por nombre, sin
+ * id: quien puede elegirlo lo resuelve aparte contra el catalogo (ver
+ * ActaFormPage). Las horas llegan como HH:mm:ss y el input usa HH:mm.
+ */
+export function mapActaToFormValues(acta: ActaResponse): ActaFormValues {
+  return {
+    departmentId: acta.departmentId,
+    duicentroId: acta.duicentroId,
+    actaDate: acta.actaDate,
+    arrivalTime: acta.arrivalTime?.slice(0, 5) ?? "",
+    departureTime: acta.departureTime?.slice(0, 5) ?? "",
+    jveDelegateId: undefined,
+    rnpnDelegateName: acta.rnpnDelegateName ?? "",
+    duicentroChiefName: acta.duicentroChiefName ?? "",
+    observations: acta.observations ?? "",
+    declaredTotal: acta.declaredTotal ?? undefined,
+    producciones:
+      acta.producciones.length > 0
+        ? acta.producciones.map((p) => ({
+            productionDate: p.productionDate,
+            declaredTotal: p.declaredTotal ?? undefined,
+            values:
+              p.values.length > 0
+                ? p.values.map((v) => ({ categoryId: v.categoryId, quantity: v.quantity }))
+                : [{ ...EMPTY_VALUE }],
+          }))
+        : [{ ...EMPTY_PRODUCCION }],
+    incidentes: acta.incidentes.map((i) => ({ incidentTypeId: i.incidentTypeId, description: i.description })),
+    acompananteIds: (acta.acompanantes ?? []).map((a) => a.temporaryDelegateId),
   };
 }
 
@@ -209,5 +268,6 @@ export function mapDraftSnapshotToFormValues(snapshot: ActaDraftSnapshot): ActaF
           }))
         : [{ ...EMPTY_PRODUCCION }],
     incidentes: c.incidentes ?? [],
+    acompananteIds: c.acompananteIds ?? [],
   };
 }

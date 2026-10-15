@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Chip, Collapse, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, Stack, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import { fiscalizationQuestionApi } from "@/api/electoralApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { FISCALIZATION_ANSWER_TYPE_LABELS } from "@/types/electoral";
 import type { FiscalizationQuestionDto } from "@/types/electoral";
@@ -51,7 +53,7 @@ export function PreguntasFiscalizacionPage() {
   const columns: GridColDef<FiscalizationQuestionDto>[] = useMemo(
     () => [
       { field: "displayOrder", headerName: "Orden", width: 90 },
-      { field: "code", headerName: "Código", width: 180 },
+      { field: "code", headerName: "Código", cellClassName: "cell-code", width: 180 },
       { field: "text", headerName: "Pregunta", flex: 1.6, minWidth: 260 },
       {
         field: "answerType",
@@ -106,48 +108,43 @@ export function PreguntasFiscalizacionPage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Preguntas del formulario de fiscalización</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Checklist que responden los delegados temporales al fiscalizar un centro. Desactivar
-            una pregunta deja de ofrecerla en formularios nuevos, sin afectar los ya llenados.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
-          Nueva pregunta
-        </Button>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Preguntas del formulario de fiscalización"
+        subtitle="Checklist que responden los delegados temporales al fiscalizar un centro. Desactivar una pregunta deja de ofrecerla en formularios nuevos, sin afectar los ya llenados."
+        actions={
+          <>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
+              Nueva pregunta
+            </Button>
+          </>
+        }
+      />
 
       <Collapse in={preguntasQuery.isError}>
-        <Alert severity="error">
-          {getApiErrorMessage(preguntasQuery.error, "No se pudo cargar el catálogo de preguntas.")}
-        </Alert>
+        <Callout tone="error" title="No se pudo cargar el catálogo de preguntas">
+          {getApiErrorMessage(preguntasQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
       {!preguntasQuery.isError && (preguntasQuery.data ?? []).length === 0 && !preguntasQuery.isLoading && (
-        <Alert severity="warning">
+        <Callout tone="warning">
           Todavía no hay preguntas cargadas — el formulario de fiscalización se verá vacío hasta
           que agregues al menos una.
-        </Alert>
+        </Callout>
       )}
 
-      <Paper variant="outlined" sx={{ height: 520 }}>
-        <DataGrid
+      <DataTable
           rows={preguntasQuery.data ?? []}
           columns={columns}
           loading={preguntasQuery.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
             sorting: { sortModel: [{ field: "displayOrder", sort: "asc" }] },
           }}
           pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
+          empty={{ title: "Aún no hay preguntas" }}
         />
-      </Paper>
 
       <PreguntaFiscalizacionFormDialog
         open={dialog.type === "create" || dialog.type === "edit"}

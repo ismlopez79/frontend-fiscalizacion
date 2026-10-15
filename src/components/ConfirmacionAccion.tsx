@@ -63,6 +63,7 @@ export function ConfirmacionAccion({
             label="Comentario"
             placeholder="Explique el motivo..."
             value={comment}
+            inputProps={{ maxLength: 2000 }}
             onChange={(e) => setComment(e.target.value)}
             error={commentIsInvalid}
             helperText={commentIsInvalid ? "El comentario es obligatorio" : " "}
@@ -70,7 +71,7 @@ export function ConfirmacionAccion({
           />
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions>
         <Button onClick={onCancel} color="inherit" disabled={loading}>
           Cancelar
         </Button>

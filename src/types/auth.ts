@@ -11,6 +11,13 @@ export interface LoginResponse {
   fullName: string;
   roles: string[];
   primerIngreso: boolean;
+  /**
+   * false = le falta correo, telefono o foto de perfil: el backend lo bloquea
+   * (403 PROFILE_INCOMPLETE_REQUIRED) de todo menos su propio perfil hasta que
+   * lo complete. Siempre true para ADMINISTRADOR. Opcional por compatibilidad
+   * con un backend que aun no lo envie (se trata como true).
+   */
+  profileComplete?: boolean;
   scope: AuthScope;
 }
 
@@ -20,6 +27,8 @@ export interface AuthUser {
   roles: string[];
   permissions: string[];
   primerIngreso: boolean;
+  /** Ver LoginResponse.profileComplete. */
+  profileComplete: boolean;
   scope: AuthScope;
 }
 

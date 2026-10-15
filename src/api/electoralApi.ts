@@ -1,11 +1,12 @@
 import { apiClient } from "./client";
 import type { BulkImportResult } from "@/types/bulkImport";
-import type { ResetPasswordResponse } from "@/types/user";
+import type { ResetPasswordResponse, SelfProfileUpdateRequest } from "@/types/user";
 import type {
   AssignmentDto,
   AssignmentFilters,
   CreateAssignmentRequest,
   CreateTemporaryDelegateRequest,
+  CreateTraineeAssignmentRequest,
   ElectoralPeriodDto,
   ElectoralPeriodRequest,
   FiscalizationQuestionDto,
@@ -13,6 +14,7 @@ import type {
   ServiceCenterDto,
   ServiceCenterRequest,
   TemporaryDelegateDto,
+  TraineeAssignmentDto,
   UpdateAssignmentRequest,
   UpdateTemporaryDelegateRequest,
 } from "@/types/electoral";
@@ -54,6 +56,10 @@ export const temporaryDelegateApi = {
     });
     return data;
   },
+  getDelegadoTemporal: async (id: number): Promise<TemporaryDelegateDto> => {
+    const { data } = await apiClient.get<TemporaryDelegateDto>(`/delegados-temporales/${id}`);
+    return data;
+  },
   createDelegadoTemporal: async (body: CreateTemporaryDelegateRequest): Promise<TemporaryDelegateDto> => {
     const { data } = await apiClient.post<TemporaryDelegateDto>("/delegados-temporales", body);
     return data;
@@ -84,6 +90,29 @@ export const temporaryDelegateApi = {
       params: { electoralPeriodId },
     });
     return data;
+  },
+  /** Perfil propio del delegado temporal en sesion (resuelto desde el JWT). */
+  getMe: async (): Promise<TemporaryDelegateDto> => {
+    const { data } = await apiClient.get<TemporaryDelegateDto>("/delegados-temporales/me");
+    return data;
+  },
+  /** Autoservicio: solo correo y telefono. */
+  updateMe: async (body: SelfProfileUpdateRequest): Promise<TemporaryDelegateDto> => {
+    const { data } = await apiClient.patch<TemporaryDelegateDto>("/delegados-temporales/me", body);
+    return data;
+  },
+  /** Foto propia del delegado temporal — mismas reglas que /usuarios/me/foto-perfil. */
+  getMiFotoPerfil: async (): Promise<Blob> => {
+    const { data } = await apiClient.get("/delegados-temporales/me/foto-perfil", { responseType: "blob" });
+    return data;
+  },
+  uploadMiFotoPerfil: async (file: File): Promise<void> => {
+    const form = new FormData();
+    form.append("file", file);
+    await apiClient.post("/delegados-temporales/me/foto-perfil", form);
+  },
+  eliminarMiFotoPerfil: async (): Promise<void> => {
+    await apiClient.delete("/delegados-temporales/me/foto-perfil");
   },
   getFotoPerfil: async (delegadoId: number): Promise<Blob> => {
     const { data } = await apiClient.get(`/delegados-temporales/${delegadoId}/foto-perfil`, {
@@ -159,6 +188,36 @@ export const assignmentApi = {
   /** Desactiva la asignacion (no la borra) — se conserva el historico de quien estuvo donde. */
   eliminarAsignacion: async (id: number): Promise<void> => {
     await apiClient.delete(`/asignaciones/${id}`);
+  },
+};
+
+/**
+ * Temporales a cargo de un delegado permanente. El administrador asigna y
+ * quita; el permanente solo consulta los suyos (getMios) para marcarlos como
+ * acompañantes al registrar un acta.
+ */
+export const traineeAssignmentApi = {
+  getDelegadosACargo: async (
+    filters: { usuarioId?: number; delegadoTemporalId?: number } = {}
+  ): Promise<TraineeAssignmentDto[]> => {
+    const params: Record<string, number> = {};
+    if (filters.usuarioId !== undefined) params.usuarioId = filters.usuarioId;
+    if (filters.delegadoTemporalId !== undefined) params.delegadoTemporalId = filters.delegadoTemporalId;
+    const { data } = await apiClient.get<TraineeAssignmentDto[]>("/delegados-a-cargo", { params });
+    return data;
+  },
+  /** Los temporales (activos) a cargo de quien esta en sesion. Lista vacia si no tiene ninguno o si es un delegado temporal. */
+  getMios: async (): Promise<TraineeAssignmentDto[]> => {
+    const { data } = await apiClient.get<TraineeAssignmentDto[]>("/delegados-a-cargo/mios");
+    return data;
+  },
+  asignar: async (body: CreateTraineeAssignmentRequest): Promise<TraineeAssignmentDto> => {
+    const { data } = await apiClient.post<TraineeAssignmentDto>("/delegados-a-cargo", body);
+    return data;
+  },
+  /** No borra la constancia en las actas ya registradas: solo impide agregarlo a actas nuevas. */
+  quitar: async (id: number): Promise<void> => {
+    await apiClient.delete(`/delegados-a-cargo/${id}`);
   },
 };
 

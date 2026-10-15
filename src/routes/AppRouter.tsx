@@ -1,38 +1,50 @@
+import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/layouts/AppShell";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RequireFullAccess } from "./RequireFullAccess";
+import { RequireCompleteProfile } from "./RequireCompleteProfile";
 
+// Pantallas que se cargan bajo demanda (cada una en su propio archivo JS):
+// ver lazyPages.ts. Login, 404 y 403 quedan en la carga inicial — son
+// chicas y la primera debe aparecer sin esperar una descarga extra.
+//
+// REGLA: una pantalla nueva se registra en lazyPages.ts y se importa desde
+// ahi. NO importarla directo aqui desde "@/pages/...": eso la mete de nuevo
+// en el archivo JS inicial y vuelve lenta la primera carga (ver CLAUDE.md).
+import {
+  ChangePasswordPage,
+  DashboardPage,
+  ActasListPage,
+  ActasPendientesPage,
+  ActaFormPage,
+  ActaDetailPage,
+  ReportesPage,
+  DepartamentosPage,
+  DuicentrosPage,
+  DelegadosPage,
+  PartidosPoliticosPage,
+  CategoriasPage,
+  TiposIncidentePage,
+  UsuariosPage,
+  RolesPage,
+  AuditoriaPage,
+  ModulosPage,
+  PerfilPage,
+  FiscalizacionListPage,
+  FiscalizacionFormPage,
+  FiscalizacionDetailPage,
+  FiscalizacionPendientesPage,
+  PeriodosElectoralesPage,
+  DelegadosTemporalesPage,
+  CentrosServicioPage,
+  AsignacionesPage,
+  TemporalesACargoPage,
+  PreguntasFiscalizacionPage,
+} from "./lazyPages";
 import { LoginPage } from "@/pages/auth/LoginPage";
-import { ChangePasswordPage } from "@/pages/auth/ChangePasswordPage";
-import { DashboardPage } from "@/pages/dashboard/DashboardPage";
-import { ActasListPage } from "@/pages/actas/ActasListPage";
-import { ActasPendientesPage } from "@/pages/actas/ActasPendientesPage";
-import { ActaFormPage } from "@/pages/actas/ActaFormPage";
-import { ActaDetailPage } from "@/pages/actas/ActaDetailPage";
-import { ReportesPage } from "@/pages/reportes/ReportesPage";
-import { DepartamentosPage } from "@/pages/administracion/departamentos/DepartamentosPage";
-import { DuicentrosPage } from "@/pages/administracion/duicentros/DuicentrosPage";
-import { DelegadosPage } from "@/pages/administracion/delegados/DelegadosPage";
-import { PartidosPoliticosPage } from "@/pages/administracion/partidos-politicos/PartidosPoliticosPage";
-import { CategoriasPage } from "@/pages/administracion/categorias/CategoriasPage";
-import { TiposIncidentePage } from "@/pages/administracion/tipos-incidente/TiposIncidentePage";
-import { UsuariosPage } from "@/pages/administracion/usuarios/UsuariosPage";
-import { RolesPage } from "@/pages/administracion/roles/RolesPage";
-import { AuditoriaPage } from "@/pages/administracion/auditoria/AuditoriaPage";
-import { ModulosPage } from "@/pages/administracion/modulos/ModulosPage";
-import { PerfilPage } from "@/pages/perfil/PerfilPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
-import { FiscalizacionListPage } from "@/pages/fiscalizacion/FiscalizacionListPage";
-import { FiscalizacionFormPage } from "@/pages/fiscalizacion/FiscalizacionFormPage";
-import { FiscalizacionDetailPage } from "@/pages/fiscalizacion/FiscalizacionDetailPage";
-import { FiscalizacionPendientesPage } from "@/pages/fiscalizacion/FiscalizacionPendientesPage";
-import { PeriodosElectoralesPage } from "@/pages/elecciones/periodos-electorales/PeriodosElectoralesPage";
-import { DelegadosTemporalesPage } from "@/pages/elecciones/delegados-temporales/DelegadosTemporalesPage";
-import { CentrosServicioPage } from "@/pages/elecciones/centros-servicio/CentrosServicioPage";
-import { AsignacionesPage } from "@/pages/elecciones/asignaciones/AsignacionesPage";
-import { PreguntasFiscalizacionPage } from "@/pages/elecciones/preguntas-fiscalizacion/PreguntasFiscalizacionPage";
 
 const ADMIN_ONLY = ["ADMINISTRADOR"];
 const ADMIN_AND_SUPERVISOR = ["ADMINISTRADOR", "SUPERVISOR"];
@@ -49,23 +61,38 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         {/* Fuera de RequireFullAccess (si no, loop) y fuera de AppShell
             (sin sidebar/menu) — ver scope PASSWORD_CHANGE_ONLY. */}
-        <Route path="/cambiar-password" element={<ChangePasswordPage />} />
+        <Route
+          path="/cambiar-password"
+          element={
+            <Suspense fallback={null}>
+              <ChangePasswordPage />
+            </Suspense>
+          }
+        />
 
         <Route element={<RequireFullAccess />}>
           <Route element={<AppShell />}>
+            {/* "Mi cuenta" queda fuera de RequireCompleteProfile: es donde se completan
+                correo, telefono y foto cuando el backend bloquea por perfil incompleto. */}
+            <Route path="/perfil" element={<PerfilPage />} />
+
+            <Route element={<RequireCompleteProfile />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
 
             <Route path="/actas" element={<ActasListPage />} />
             <Route path="/actas/nueva" element={<ActaFormPage />} />
+            {/* Modo practica: la MISMA pantalla del formulario (mismo archivo JS,
+                sin descarga extra); ella detecta esta ruta y no guarda nada real.
+                La key evita que React reutilice el estado del formulario real
+                al pasar de "nueva" a "practica" (o al reves). */}
+            <Route path="/actas/practica" element={<ActaFormPage key="practica" />} />
             <Route path="/actas/:id" element={<ActaDetailPage />} />
             <Route path="/actas/:id/editar" element={<ActaFormPage />} />
 
             <Route path="/fiscalizacion" element={<FiscalizacionListPage />} />
             <Route path="/fiscalizacion/nueva" element={<FiscalizacionFormPage />} />
             <Route path="/fiscalizacion/:id" element={<FiscalizacionDetailPage />} />
-
-            <Route path="/perfil" element={<PerfilPage />} />
 
             {/* Solo supervisor/administrador */}
             <Route element={<ProtectedRoute allowedRoles={REVIEWERS} />}>
@@ -103,6 +130,8 @@ export function AppRouter() {
               <Route path="/elecciones/delegados-temporales" element={<DelegadosTemporalesPage />} />
               <Route path="/elecciones/centros-servicio" element={<CentrosServicioPage />} />
               <Route path="/elecciones/asignaciones" element={<AsignacionesPage />} />
+              <Route path="/elecciones/temporales-a-cargo" element={<TemporalesACargoPage />} />
+            </Route>
             </Route>
           </Route>
         </Route>

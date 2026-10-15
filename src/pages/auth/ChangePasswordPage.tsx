@@ -16,7 +16,7 @@ import { StaggerItem } from "@/components/login/StaggerItem";
 import type { ChangePasswordRequest } from "@/types/auth";
 
 const baseSchema = {
-  newPassword: z.string().min(8, "Mínimo 8 caracteres"),
+  newPassword: z.string().min(8, "Mínimo 8 caracteres").max(72, "Máximo 72 caracteres"),
   confirmPassword: z.string().min(1, "Confirma la nueva contraseña"),
 };
 

@@ -71,4 +71,22 @@ export const reportesApi = {
       ),
     };
   },
+  /**
+   * Actas fiscalizadas y produccion por delegado temporal. Ademas de
+   * REPORT_EXPORT requiere el modulo de Elecciones encendido: apagado
+   * responde 403 MODULE_DISABLED.
+   */
+  getReporteDelegadosTemporales: async (range: DashboardDateRange, electoralPeriodId?: number): Promise<ReportePdf> => {
+    const response = await apiClient.get("/reportes/delegados-temporales.pdf", {
+      params: { ...rangeParams(range), electoralPeriodId },
+      responseType: "blob",
+    });
+    return {
+      blob: response.data,
+      filename: extractFilename(
+        response.headers["content-disposition"],
+        buildFallbackFilename("delegados-temporales", range)
+      ),
+    };
+  },
 };

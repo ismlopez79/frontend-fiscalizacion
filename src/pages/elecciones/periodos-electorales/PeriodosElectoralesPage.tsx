@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Chip, Collapse, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { Button, Chip, Collapse, IconButton, Stack, Tooltip } from "@mui/material";
 import type { GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/AddRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import { electoralPeriodApi } from "@/api/electoralApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
 import { useToast } from "@/hooks/useToast";
@@ -38,8 +40,8 @@ export function PeriodosElectoralesPage() {
 
   const columns: GridColDef<ElectoralPeriodDto>[] = useMemo(
     () => [
-      { field: "code", headerName: "Código", width: 120 },
-      { field: "name", headerName: "Nombre", flex: 1, minWidth: 220 },
+      { field: "code", headerName: "Código", cellClassName: "cell-code", width: 120 },
+      { field: "name", headerName: "Nombre", cellClassName: "cell-strong", flex: 1, minWidth: 220 },
       { field: "startDate", headerName: "Inicio", width: 120 },
       { field: "endDate", headerName: "Fin", width: 120 },
       {
@@ -88,48 +90,43 @@ export function PeriodosElectoralesPage() {
   );
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Box>
-          <Typography variant="h3">Períodos electorales</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Ancla temporal del módulo de fiscalización electoral. Solo puede haber un período activo
-            a la vez — los delegados temporales y centros de servicio se dan de alta contra él.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
-          Nuevo período
-        </Button>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Períodos electorales"
+        subtitle="Ancla temporal del módulo de fiscalización electoral. Solo puede haber un período activo a la vez — los delegados temporales y centros de servicio se dan de alta contra él."
+        actions={
+          <>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ type: "create" })}>
+              Nuevo período
+            </Button>
+          </>
+        }
+      />
 
       <Collapse in={periodosQuery.isError}>
-        <Alert severity="error">
-          {getApiErrorMessage(periodosQuery.error, "No se pudo cargar el listado de períodos.")}
-        </Alert>
+        <Callout tone="error" title="No se pudo cargar el listado de períodos">
+          {getApiErrorMessage(periodosQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
       {!periodosQuery.isError && (periodosQuery.data ?? []).every((p) => !p.active) && !periodosQuery.isLoading && (
-        <Alert severity="warning">
+        <Callout tone="warning">
           No hay ningún período electoral activo. Activa uno para poder dar de alta delegados
           temporales y centros de servicio.
-        </Alert>
+        </Callout>
       )}
 
-      <Paper variant="outlined" sx={{ height: 480 }}>
-        <DataGrid
+      <DataTable
           rows={periodosQuery.data ?? []}
           columns={columns}
           loading={periodosQuery.isLoading}
-          disableRowSelectionOnClick
-          density="comfortable"
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
             sorting: { sortModel: [{ field: "startDate", sort: "desc" }] },
           }}
           pageSizeOptions={[10, 25, 50]}
-          sx={{ border: "none" }}
+          empty={{ title: "Aún no hay períodos electorales" }}
         />
-      </Paper>
 
       <PeriodoElectoralFormDialog
         open={dialog.type === "create" || dialog.type === "edit"}

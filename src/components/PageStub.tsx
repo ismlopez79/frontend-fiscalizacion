@@ -1,5 +1,8 @@
-import { Alert, Paper, Stack, Typography } from "@mui/material";
+import { Stack } from "@mui/material";
 import ConstructionIcon from "@mui/icons-material/ConstructionOutlined";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Surface } from "@/components/ui/Surface";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface PageStubProps {
   title: string;
@@ -16,19 +19,15 @@ interface PageStubProps {
  */
 export function PageStub({ title, description, block }: PageStubProps) {
   return (
-    <Paper variant="outlined" sx={{ p: 4, maxWidth: 640 }}>
-      <Stack spacing={2}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <ConstructionIcon color="disabled" />
-          <Typography variant="h3">{title}</Typography>
-        </Stack>
-        <Typography variant="body1" color="text.secondary">
-          {description}
-        </Typography>
-        <Alert severity="info" variant="outlined">
-          Pendiente de implementación — {block} del roadmap de frontend.
-        </Alert>
-      </Stack>
-    </Paper>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader title={title} subtitle={description} />
+      <Surface>
+        <EmptyState
+          icon={<ConstructionIcon />}
+          title="Pantalla en construcción"
+          hint={`Pendiente de implementación — ${block} del roadmap de frontend.`}
+        />
+      </Surface>
+    </Stack>
   );
 }

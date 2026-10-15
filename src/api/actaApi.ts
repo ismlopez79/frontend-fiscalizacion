@@ -6,6 +6,7 @@ import type {
   ActaDraftSaveResponse,
   ActaFileDto,
   ActaListFilters,
+  ActaPracticaResponse,
   ActaResponse,
   BulkApprovalResultDto,
   CreateActaRequest,
@@ -19,12 +20,22 @@ export const actaApi = {
     page: number,
     size: number
   ): Promise<PageResponse<ActaResponse>> => {
-    const params: Record<string, string | number | boolean> = { page, size };
-    if (filters.createdByMe !== undefined) params.createdByMe = filters.createdByMe;
-    if (filters.status) params.status = filters.status;
-    if (filters.actaNumber) params.actaNumber = filters.actaNumber;
-    if (filters.actaDate) params.actaDate = filters.actaDate;
-    if (filters.jveDelegateId !== undefined) params.jveDelegateId = filters.jveDelegateId;
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (filters.createdByMe !== undefined) params.set("createdByMe", String(filters.createdByMe));
+    if (filters.status) params.set("status", filters.status);
+    if (filters.actaNumber) params.set("actaNumber", filters.actaNumber);
+    if (filters.actaDate) params.set("actaDate", filters.actaDate);
+    if (filters.jveDelegateId !== undefined) params.set("jveDelegateId", String(filters.jveDelegateId));
+    // Orden del listado: por fecha del acta (la columna "Fecha"), la mas
+    // reciente primero; dentro de una misma fecha, la ultima ingresada al
+    // sistema primero; "id" desempata para que el orden no cambie entre
+    // paginas. Sin esto el backend ordena por actaDate ASCENDENTE
+    // (@PageableDefault) y se veian primero las mas viejas.
+    // Spring espera "sort" repetido (sort=...&sort=...), por eso URLSearchParams
+    // y no un arreglo (axios lo mandaria como sort[]=).
+    params.append("sort", "actaDate,desc");
+    params.append("sort", "createdAt,desc");
+    params.append("sort", "id,desc");
     const { data } = await apiClient.get<PageResponse<ActaResponse>>("/actas", { params });
     return data;
   },
@@ -47,6 +58,34 @@ export const actaApi = {
   createActa: async (body: CreateActaRequest): Promise<ActaResponse> => {
     const { data } = await apiClient.post<ActaResponse>("/actas", body);
     return data;
+  },
+  /**
+   * Corrige un acta en REGISTRADA u OBSERVADA: mismo body que createActa,
+   * sin cambiar el departamento (su numero pertenece a el). Responde el acta
+   * completa con el total recalculado y el mismo numero y estado. 409 si el
+   * acta ya no esta en un estado corregible; 403 si no es del usuario.
+   */
+  updateActa: async (id: number, body: CreateActaRequest): Promise<ActaResponse> => {
+    const { data } = await apiClient.put<ActaResponse>(`/actas/${id}`, body);
+    return data;
+  },
+  /**
+   * Modo practica: mismo body que createActa, pero el backend solo valida y
+   * devuelve el acta simulada (numero PRACTICA-xxxx, id null) sin guardar
+   * nada. 403 MODULE_DISABLED si el modulo TRAINING esta apagado.
+   */
+  crearActaPractica: async (body: CreateActaRequest): Promise<ActaPracticaResponse> => {
+    const { data } = await apiClient.post<ActaPracticaResponse>("/practica/actas", body);
+    return data;
+  },
+  /**
+   * Modo practica: el backend valida la foto/PDF y la descarta. La respuesta
+   * no trae enlace de descarga — la vista previa sale del archivo local.
+   */
+  validarArchivoPractica: async (file: File): Promise<void> => {
+    const form = new FormData();
+    form.append("file", file);
+    await apiClient.post("/practica/actas/archivos", form);
   },
   /**
    * Flujo de autoguardado (reemplaza a createActa durante la captura, ver
@@ -120,6 +159,18 @@ export const actaApi = {
   },
   anular: async (id: number, comment: string): Promise<ActaResponse> => {
     const { data } = await apiClient.post<ActaResponse>(`/actas/${id}/anular`, { comment });
+    return data;
+  },
+  /**
+   * PDF del acta, generado al vuelo por el backend (nunca se guarda en el
+   * servidor) — mismo patron de blob autenticado que descargarArchivo, ya
+   * que un <a href="..."> directo no puede llevar el header Authorization.
+   * 409 BUSINESS_RULE_VIOLATION si el acta todavia esta en BORRADOR.
+   */
+  descargarPdf: async (actaId: number): Promise<Blob> => {
+    const { data } = await apiClient.get(`/actas/${actaId}/pdf`, {
+      responseType: "blob",
+    });
     return data;
   },
   getArchivos: async (actaId: number): Promise<ActaFileDto[]> => {

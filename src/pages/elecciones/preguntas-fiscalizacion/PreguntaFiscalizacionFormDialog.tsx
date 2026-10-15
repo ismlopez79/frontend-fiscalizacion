@@ -24,8 +24,8 @@ import { FISCALIZATION_ANSWER_TYPES, FISCALIZATION_ANSWER_TYPE_LABELS } from "@/
 import type { FiscalizationQuestionDto } from "@/types/electoral";
 
 const schema = z.object({
-  code: z.string().min(1, "El código es obligatorio").max(40, "Máximo 40 caracteres"),
-  text: z.string().min(1, "La pregunta es obligatoria"),
+  code: z.string().min(1, "El código es obligatorio").max(30, "Máximo 30 caracteres"),
+  text: z.string().min(1, "La pregunta es obligatoria").max(255, "Máximo 255 caracteres"),
   answerType: z.enum(["SI_NO", "SI_NO_PARCIAL", "TEXTO_LIBRE"], { required_error: "Selecciona un tipo de respuesta" }),
   displayOrder: z.number({ invalid_type_error: "Requerido" }).min(0, "Debe ser 0 o mayor"),
   active: z.boolean(),
@@ -159,7 +159,7 @@ export function PreguntaFiscalizacionFormDialog({ open, pregunta, onClose }: Pre
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

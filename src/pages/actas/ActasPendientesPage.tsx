@@ -1,21 +1,24 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Chip, Collapse, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
+import { Box, Button, Collapse, IconButton, Paper, Skeleton, Stack, Tooltip } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import type { GridColDef, GridPaginationModel } from "@mui/x-data-grid";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
-import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import { actaApi } from "@/api/actaApi";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
 import { useToast } from "@/hooks/useToast";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
+import { designTokens } from "@/theme/theme";
 import type { ActaResponse } from "@/types/acta";
+import { EmptyState, actaColumns, actaGridSx, actaNumberFormatter } from "./actaUi";
 
 type ConfirmState = { type: "aprobar" | "observar" | "rechazar"; acta: ActaResponse } | null;
 
@@ -23,8 +26,8 @@ type ConfirmState = { type: "aprobar" | "observar" | "rechazar"; acta: ActaRespo
  * Bandeja de trabajo del revisor: solo actas en PENDIENTE_REVISION, via el
  * endpoint dedicado GET /actas/pendientes-revision (no /actas?status=...).
  * Acciones rapidas por fila para no tener que abrir cada acta para
- * aprobar/observar/rechazar — abrir el detalle sigue disponible para los
- * casos que necesitan mas contexto (o para anular, que solo vive ahi).
+ * aprobar/observar/rechazar — tocar la fila abre el detalle para los casos
+ * que necesitan mas contexto (o para anular, que solo vive ahi).
  */
 export function ActasPendientesPage() {
   const navigate = useNavigate();
@@ -86,74 +89,36 @@ export function ActasPendientesPage() {
     onError: (error) => showToast("error", getApiErrorMessage(error, "No se pudieron aprobar las actas.")),
   });
 
+  const pending = aprobarMutation.isPending || observarMutation.isPending || rechazarMutation.isPending;
+
   const columns: GridColDef<ActaResponse>[] = useMemo(
     () => [
-      { field: "actaNumber", headerName: "N° de acta", width: 160 },
-      { field: "actaDate", headerName: "Fecha", width: 120 },
-      { field: "duicentroName", headerName: "Duicentro", flex: 1, minWidth: 180 },
-      { field: "createdByUsername", headerName: "Creada por", width: 130 },
-      {
-        field: "calculatedTotal",
-        headerName: "Total",
-        width: 100,
-        valueGetter: (_v, row) => row.calculatedTotal,
-      },
-      {
-        field: "flags",
-        headerName: "Alertas",
-        width: 140,
-        sortable: false,
-        renderCell: (params) => (
-          <Stack direction="row" spacing={0.5}>
-            {params.row.hasDiscrepancy && (
-              <Tooltip title="El total declarado no coincide con el calculado">
-                <Chip
-                  size="small"
-                  icon={<WarningAmberIcon fontSize="small" />}
-                  label="Discrepancia"
-                  color="warning"
-                  variant="outlined"
-                />
-              </Tooltip>
-            )}
-            {params.row.possibleDuplicate && (
-              <Tooltip title="Posible duplicado de otra acta">
-                <Chip size="small" label="Duplicado?" color="error" variant="outlined" />
-              </Tooltip>
-            )}
-          </Stack>
-        ),
-      },
+      actaColumns.number,
+      actaColumns.date,
+      actaColumns.duicentro,
+      actaColumns.createdBy,
+      actaColumns.total,
+      actaColumns.flags,
       {
         field: "actions",
-        headerName: "Acciones",
-        width: 170,
+        headerName: "",
+        width: 196,
         sortable: false,
         filterable: false,
+        align: "right",
         renderCell: (params) => {
           const acta = params.row;
-          const pending = aprobarMutation.isPending || observarMutation.isPending || rechazarMutation.isPending;
+          // stopPropagation: las acciones no deben abrir el detalle (eso es el clic en la fila).
           return (
-            <Stack direction="row" spacing={0.5}>
-              <Tooltip title="Aprobar">
-                <span>
-                  <IconButton
-                    size="small"
-                    color="success"
-                    disabled={pending}
-                    onClick={() => setConfirmState({ type: "aprobar", acta })}
-                  >
-                    <CheckCircleOutlineRoundedIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
+            <Stack direction="row" gap={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
               <Tooltip title="Observar">
                 <span>
                   <IconButton
                     size="small"
-                    color="warning"
+                    aria-label={`Observar acta ${acta.actaNumber}`}
                     disabled={pending}
                     onClick={() => setConfirmState({ type: "observar", acta })}
+                    sx={{ color: designTokens.status.warning.fg }}
                   >
                     <FlagOutlinedIcon fontSize="small" />
                   </IconButton>
@@ -163,74 +128,119 @@ export function ActasPendientesPage() {
                 <span>
                   <IconButton
                     size="small"
-                    color="error"
+                    aria-label={`Rechazar acta ${acta.actaNumber}`}
                     disabled={pending}
                     onClick={() => setConfirmState({ type: "rechazar", acta })}
+                    sx={{ color: designTokens.status.error.fg }}
                   >
                     <CancelOutlinedIcon fontSize="small" />
                   </IconButton>
                 </span>
               </Tooltip>
-              <Tooltip title="Ver detalle">
-                <IconButton size="small" onClick={() => navigate(`/actas/${acta.id}`)}>
-                  <VisibilityOutlinedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              <Button
+                size="small"
+                variant="contained"
+                color="success"
+                startIcon={<CheckRoundedIcon />}
+                disabled={pending}
+                onClick={() => setConfirmState({ type: "aprobar", acta })}
+                sx={{ ml: 0.5, minHeight: 32 }}
+              >
+                Aprobar
+              </Button>
             </Stack>
           );
         },
       },
     ],
-    [navigate, aprobarMutation.isPending, observarMutation.isPending, rechazarMutation.isPending]
+    [pending]
   );
 
   const totalPendientes = pendientesQuery.data?.totalElements ?? 0;
 
   return (
-    <Stack spacing={2.5}>
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" rowGap={1}>
-        <Stack>
-          <Typography variant="h3">Actas pendientes de revisión</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Cola de trabajo para supervisores: actas en estado Pendiente de revisión, con acceso
-            directo a aprobar, observar o rechazar.
-          </Typography>
-        </Stack>
-        <Button
-          variant="outlined"
-          color="success"
-          startIcon={<DoneAllRoundedIcon />}
-          disabled={totalPendientes === 0 || aprobarTodasMutation.isPending}
-          onClick={() => setConfirmAprobarTodas(true)}
-        >
-          Aprobar todas
-        </Button>
-      </Stack>
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2 }}>
+      <PageHeader
+        title="Pendientes de revisión"
+        titleAdornment={
+          pendientesQuery.isLoading ? (
+            <Skeleton variant="rounded" width={40} height={26} sx={{ borderRadius: 999 }} />
+          ) : (
+            <Box
+              component="span"
+              aria-label={`${totalPendientes} pendientes`}
+              sx={{
+                px: 1.25,
+                height: 26,
+                display: "inline-flex",
+                alignItems: "center",
+                borderRadius: 999,
+                bgcolor: totalPendientes > 0 ? designTokens.status.warning.bg : designTokens.status.success.bg,
+                color: totalPendientes > 0 ? designTokens.status.warning.fg : designTokens.status.success.fg,
+                fontWeight: 700,
+                fontSize: "0.8125rem",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {actaNumberFormatter.format(totalPendientes)}
+            </Box>
+          )
+        }
+        subtitle="Aprueba, observa o rechaza desde la fila. Toca el acta para revisar su detalle y archivos."
+        actions={
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<DoneAllRoundedIcon />}
+            disabled={totalPendientes === 0 || aprobarTodasMutation.isPending}
+            onClick={() => setConfirmAprobarTodas(true)}
+          >
+            Aprobar todas
+          </Button>
+        }
+      />
 
       <Collapse in={pendientesQuery.isError}>
-        <Alert severity="error">
-          {getApiErrorMessage(pendientesQuery.error, "No se pudo cargar la bandeja de pendientes.")}
-        </Alert>
+        <Callout tone="error" title="No se pudo cargar la bandeja">
+          {getApiErrorMessage(pendientesQuery.error, "Revisa tu conexión e inténtalo de nuevo.")}
+        </Callout>
       </Collapse>
 
-      {!pendientesQuery.isError && (pendientesQuery.data?.content ?? []).length === 0 && !pendientesQuery.isLoading && (
-        <Alert severity="success">No hay actas pendientes de revisión.</Alert>
-      )}
-
-      <Paper variant="outlined" sx={{ height: 600 }}>
+      <Paper variant="outlined" sx={{ overflow: "hidden" }}>
         <DataGrid
+          autoHeight
           rows={pendientesQuery.data?.content ?? []}
           columns={columns}
           loading={pendientesQuery.isFetching}
           disableRowSelectionOnClick
-          density="comfortable"
+          disableColumnMenu
+          rowHeight={60}
+          columnHeaderHeight={44}
           paginationMode="server"
-          rowCount={pendientesQuery.data?.totalElements ?? 0}
+          rowCount={totalPendientes}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[10, 20, 50]}
-          onRowDoubleClick={(params) => navigate(`/actas/${params.row.id}`)}
-          sx={{ border: "none" }}
+          onRowClick={(params) => navigate(`/actas/${params.row.id}`)}
+          onCellKeyDown={(params, event) => {
+            if (event.key === "Enter" && params.field !== "actions") navigate(`/actas/${params.row.id}`);
+          }}
+          localeText={{
+            MuiTablePagination: {
+              labelRowsPerPage: "Por página",
+              labelDisplayedRows: ({ from, to, count }) => `${from}–${to} de ${actaNumberFormatter.format(count)}`,
+            },
+          }}
+          slots={{
+            noRowsOverlay: () => (
+              <EmptyState
+                icon={<TaskAltRoundedIcon sx={{ color: designTokens.status.success.fg }} />}
+                title="Todo al día"
+                hint="No hay actas esperando revisión. Las nuevas aparecerán aquí en cuanto se envíen."
+              />
+            ),
+          }}
+          sx={{ ...actaGridSx, "--DataGrid-overlayHeight": "300px" }}
         />
       </Paper>
 

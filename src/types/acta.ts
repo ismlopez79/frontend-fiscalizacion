@@ -70,7 +70,24 @@ export interface CreateActaRequest {
   declaredTotal?: number;
   producciones: ProduccionRequest[];
   incidentes?: IncidenteRequest[];
+  /**
+   * Delegados temporales que acompañaron al permanente (maximo 30). Solo se
+   * aceptan los que el dueño del acta tiene a cargo (GET
+   * /delegados-a-cargo/mios). En PUT /actas/{id} la lista REEMPLAZA a la
+   * anterior: omitirla quita a todos los acompañantes ya registrados.
+   */
+  acompananteIds?: number[];
 }
+
+/** Delegado temporal que acompaño al permanente en el acta. */
+export interface ActaAcompananteDto {
+  temporaryDelegateId: number;
+  fullName: string;
+  dui: string;
+  politicalPartyName: string | null;
+}
+
+export type ActaCreatorType = "PERMANENT" | "TEMPORARY";
 
 /**
  * Shape unico que devuelven TODOS los endpoints de actas (crear, consultar,
@@ -97,11 +114,25 @@ export interface ActaResponse {
   hasDiscrepancy: boolean;
   possibleDuplicate: boolean;
   createdByUsername: string;
+  /**
+   * Tipo de cuenta del dueño: usuario permanente o delegado temporal. Las dos
+   * cuentas viven en tablas distintas, asi que el username solo no identifica
+   * al dueño — siempre se compara junto con este campo.
+   */
+  createdByType: ActaCreatorType;
   createdAt: string;
   updatedAt: string;
   producciones: ProduccionResponse[];
   incidentes: IncidenteResponse[];
+  /** Lista vacia si el acta no registro acompañantes. */
+  acompanantes: ActaAcompananteDto[];
 }
+
+/**
+ * POST /practica/actas: mismo shape que un acta real, pero simulada — no se
+ * guarda, asi que no tiene id (ni detalle, archivos o PDF que consultar).
+ */
+export type ActaPracticaResponse = Omit<ActaResponse, "id"> & { id: null };
 
 export interface ActaFileDto {
   id: number;
@@ -154,6 +185,7 @@ export interface ActaDraftContent {
   declaredTotal?: number | null;
   producciones?: ProduccionRequest[];
   incidentes?: IncidenteRequest[];
+  acompananteIds?: number[];
 }
 
 export interface CreateBorradorRequest {

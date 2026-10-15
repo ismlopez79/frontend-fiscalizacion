@@ -9,10 +9,9 @@ import { AuthLayout } from "@/layouts/AuthLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginCard } from "@/components/login/LoginCard";
 import { JveLogo } from "@/components/login/JveLogo";
-import { LoginHeader } from "@/components/login/LoginHeader";
 import { FormInput } from "@/components/login/FormInput";
 import { PasswordInput } from "@/components/login/PasswordInput";
-import { LoginFormOptions } from "@/components/login/LoginFormOptions";
+import { ForgotPasswordHint } from "@/components/login/ForgotPasswordHint";
 import { LoginButton } from "@/components/login/LoginButton";
 import { LoginFooter } from "@/components/login/LoginFooter";
 import { StaggerItem } from "@/components/login/StaggerItem";
@@ -29,13 +28,7 @@ export function LoginPage() {
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [loginError, setLoginError] = useState<string | null>(
-    // Viene del interceptor global (client.ts): un delegado temporal con
-    // sesion abierta recibio 403 MODULE_DISABLED en algun request y fue
-    // redirigido aqui a la fuerza — ver seccion 4.4 del prompt de frontend.
-    searchParams.get("moduleDisabledMessage")
-  );
-  const [remember, setRemember] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const {
     register,
@@ -54,18 +47,16 @@ export function LoginPage() {
       const redirectTo = searchParams.get("redirectTo");
       navigate(redirectTo ?? "/dashboard", { replace: true });
     } catch (error) {
-      const errorCode = getApiErrorCode(error);
-      if (errorCode === "ACCOUNT_LOCKED") {
-        setLoginError(
-          "Su cuenta está bloqueada por demasiados intentos fallidos. Contacte al administrador."
-        );
-      } else if (errorCode === "MODULE_DISABLED") {
-        // Delegado temporal con el modulo de Elecciones apagado. El backend
-        // ya manda el mensaje listo para mostrar tal cual (en español).
-        setLoginError(getApiErrorMessage(error));
-      } else {
-        setLoginError("Usuario o contraseña incorrectos.");
-      }
+      // Se muestra el message del backend tal cual. A proposito el login ya no
+      // distingue usuario inexistente, contraseña mala, cuenta bloqueada o
+      // inactiva, ni delegado temporal con Elecciones apagado (todo es 401
+      // INVALID_CREDENTIALS con el mismo mensaje); 429 TOO_MANY_ATTEMPTS trae
+      // el tiempo de espera.
+      const fallback =
+        getApiErrorCode(error) === "TOO_MANY_ATTEMPTS"
+          ? "Demasiados intentos fallidos. Espera unos minutos antes de volver a intentar."
+          : "Usuario o contraseña incorrectos.";
+      setLoginError(getApiErrorMessage(error, fallback, { preferFallbackOn401: true }));
     }
   };
 
@@ -76,23 +67,19 @@ export function LoginPage() {
           <JveLogo />
         </StaggerItem>
 
-        <StaggerItem delay={80}>
-          <LoginHeader />
-        </StaggerItem>
-
-        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 3 }}>
           <Stack spacing={2.25}>
             <Collapse in={!!loginError}>
               <Alert
                 severity="error"
                 role="alert"
-                sx={{ borderRadius: "10px", fontSize: 14 }}
+                sx={{ borderRadius: "14px", fontSize: 14 }}
               >
                 {loginError}
               </Alert>
             </Collapse>
 
-            <StaggerItem delay={140}>
+            <StaggerItem delay={100}>
               <FormInput
                 icon={<PersonOutlineRoundedIcon fontSize="small" />}
                 placeholder="Usuario"
@@ -105,7 +92,7 @@ export function LoginPage() {
               />
             </StaggerItem>
 
-            <StaggerItem delay={190}>
+            <StaggerItem delay={160}>
               <PasswordInput
                 placeholder="Contraseña"
                 aria-label="Contraseña"
@@ -116,8 +103,8 @@ export function LoginPage() {
               />
             </StaggerItem>
 
-            <StaggerItem delay={240}>
-              <LoginFormOptions remember={remember} onRememberChange={setRemember} />
+            <StaggerItem delay={220}>
+              <ForgotPasswordHint />
             </StaggerItem>
 
             <StaggerItem delay={290}>
@@ -126,7 +113,7 @@ export function LoginPage() {
           </Stack>
         </Box>
 
-        <StaggerItem delay={340}>
+        <StaggerItem delay={320}>
           <LoginFooter />
         </StaggerItem>
       </LoginCard>

@@ -22,9 +22,9 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import type { ProductionCategoryDto } from "@/types/catalog";
 
 const schema = z.object({
-  code: z.string().min(1, "El código es obligatorio"),
-  name: z.string().min(1, "El nombre es obligatorio"),
-  description: z.string().optional(),
+  code: z.string().min(1, "El código es obligatorio").max(30, "Máximo 30 caracteres"),
+  name: z.string().min(1, "El nombre es obligatorio").max(120, "Máximo 120 caracteres"),
+  description: z.string().max(255, "Máximo 255 caracteres").optional(),
   displayOrder: z.number({ invalid_type_error: "Debe ser un número" }).int().min(0, "Debe ser 0 o mayor"),
   active: z.boolean(),
 });
@@ -148,7 +148,7 @@ export function CategoriaFormDialog({ open, categoria, onClose }: CategoriaFormD
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button onClick={onClose} color="inherit" disabled={mutation.isPending}>
             Cancelar
           </Button>

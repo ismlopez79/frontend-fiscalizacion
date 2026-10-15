@@ -1,5 +1,7 @@
 import { Box } from "@mui/material";
-import logo from "@/logo/logo.png";
+// Version optimizada (720px WebP, ~52 KB) del logo original src/logo/logo.png (1495px, 429 KB):
+// se muestra a 230px como maximo, asi que alcanza incluso para pantallas 3x.
+import logo from "@/logo/logo-720.webp";
 
 /**
  * Logo institucional JVE. Se usa el archivo provisto tal cual: sin
@@ -20,7 +22,7 @@ export function JveLogo() {
         alt="Junta de Vigilancia Electoral"
         sx={{
           width: "100%",
-          maxWidth: 260,
+          maxWidth: 230,
           height: "auto",
           objectFit: "contain",
           userSelect: "none",
