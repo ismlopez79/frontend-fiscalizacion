@@ -31,16 +31,19 @@ import {
   AuditoriaPage,
   ModulosPage,
   PerfilPage,
-  FiscalizacionListPage,
-  FiscalizacionFormPage,
-  FiscalizacionDetailPage,
-  FiscalizacionPendientesPage,
   PeriodosElectoralesPage,
   DelegadosTemporalesPage,
   CentrosServicioPage,
   AsignacionesPage,
   TemporalesACargoPage,
-  PreguntasFiscalizacionPage,
+  MisActividadesPage,
+  InformeActividadPage,
+  ActividadesPage,
+  ActividadDetailPage,
+  BandejaInformesPage,
+  FasesPage,
+  PlantillasPage,
+  PlantillaEditorPage,
 } from "./lazyPages";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -49,6 +52,7 @@ import { ForbiddenPage } from "@/pages/ForbiddenPage";
 const ADMIN_ONLY = ["ADMINISTRADOR"];
 const ADMIN_AND_SUPERVISOR = ["ADMINISTRADOR", "SUPERVISOR"];
 const REVIEWERS = ["ADMINISTRADOR", "SUPERVISOR"];
+const DELEGATES = ["DELEGADO_TEMPORAL", "DIGITADOR", "ADMINISTRADOR"];
 
 export function AppRouter() {
   return (
@@ -90,14 +94,27 @@ export function AppRouter() {
             <Route path="/actas/:id" element={<ActaDetailPage />} />
             <Route path="/actas/:id/editar" element={<ActaFormPage />} />
 
-            <Route path="/fiscalizacion" element={<FiscalizacionListPage />} />
-            <Route path="/fiscalizacion/nueva" element={<FiscalizacionFormPage />} />
-            <Route path="/fiscalizacion/:id" element={<FiscalizacionDetailPage />} />
+            {/* Fiscalizacion electoral por fases. El informe lo abre cualquier rol:
+                el backend decide (asignado, revisor o admin) y responde 403 si no. */}
+            <Route path="/fiscalizacion-electoral/actividades/:id/informe" element={<InformeActividadPage />} />
+            <Route element={<ProtectedRoute allowedRoles={DELEGATES} />}>
+              <Route path="/fiscalizacion-electoral/mis-actividades" element={<MisActividadesPage />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={REVIEWERS} />}>
+              <Route path="/fiscalizacion-electoral/actividades" element={<ActividadesPage />} />
+              <Route path="/fiscalizacion-electoral/actividades/:id" element={<ActividadDetailPage />} />
+              <Route path="/fiscalizacion-electoral/informes" element={<BandejaInformesPage />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={ADMIN_ONLY} />}>
+              <Route path="/fiscalizacion-electoral/fases" element={<FasesPage />} />
+              <Route path="/fiscalizacion-electoral/plantillas" element={<PlantillasPage />} />
+              <Route path="/fiscalizacion-electoral/plantillas/nueva" element={<PlantillaEditorPage />} />
+              <Route path="/fiscalizacion-electoral/plantillas/:id" element={<PlantillaEditorPage />} />
+            </Route>
 
             {/* Solo supervisor/administrador */}
             <Route element={<ProtectedRoute allowedRoles={REVIEWERS} />}>
               <Route path="/actas/pendientes" element={<ActasPendientesPage />} />
-              <Route path="/fiscalizacion/pendientes-revision" element={<FiscalizacionPendientesPage />} />
               <Route path="/reportes" element={<ReportesPage />} />
             </Route>
 
@@ -117,11 +134,6 @@ export function AppRouter() {
               <Route path="/administracion/roles" element={<RolesPage />} />
               <Route path="/administracion/auditoria" element={<AuditoriaPage />} />
               <Route path="/administracion/modulos" element={<ModulosPage />} />
-            </Route>
-
-            {/* Elecciones: catalogos operativos (admin + supervisor) */}
-            <Route element={<ProtectedRoute allowedRoles={ADMIN_AND_SUPERVISOR} />}>
-              <Route path="/elecciones/preguntas-fiscalizacion" element={<PreguntasFiscalizacionPage />} />
             </Route>
 
             {/* Elecciones: solo administrador */}

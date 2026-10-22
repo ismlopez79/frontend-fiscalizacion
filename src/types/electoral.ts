@@ -159,29 +159,3 @@ export interface CreateTraineeAssignmentRequest {
   temporaryDelegateId: number;
 }
 
-export type FiscalizationAnswerType = "SI_NO" | "SI_NO_PARCIAL" | "TEXTO_LIBRE";
-
-export const FISCALIZATION_ANSWER_TYPES: FiscalizationAnswerType[] = ["SI_NO", "SI_NO_PARCIAL", "TEXTO_LIBRE"];
-
-export const FISCALIZATION_ANSWER_TYPE_LABELS: Record<FiscalizationAnswerType, string> = {
-  SI_NO: "Sí / No",
-  SI_NO_PARCIAL: "Sí / No / Parcial",
-  TEXTO_LIBRE: "Texto libre",
-};
-
-export interface FiscalizationQuestionDto {
-  id: number;
-  code: string;
-  text: string;
-  answerType: FiscalizationAnswerType;
-  active: boolean;
-  displayOrder: number;
-}
-
-export interface FiscalizationQuestionRequest {
-  code: string;
-  text: string;
-  answerType: FiscalizationAnswerType;
-  active: boolean;
-  displayOrder: number;
-}

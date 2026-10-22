@@ -30,16 +30,20 @@ const loaders = {
   AuditoriaPage: () => import("@/pages/administracion/auditoria/AuditoriaPage"),
   ModulosPage: () => import("@/pages/administracion/modulos/ModulosPage"),
   PerfilPage: () => import("@/pages/perfil/PerfilPage"),
-  FiscalizacionListPage: () => import("@/pages/fiscalizacion/FiscalizacionListPage"),
-  FiscalizacionFormPage: () => import("@/pages/fiscalizacion/FiscalizacionFormPage"),
-  FiscalizacionDetailPage: () => import("@/pages/fiscalizacion/FiscalizacionDetailPage"),
-  FiscalizacionPendientesPage: () => import("@/pages/fiscalizacion/FiscalizacionPendientesPage"),
   PeriodosElectoralesPage: () => import("@/pages/elecciones/periodos-electorales/PeriodosElectoralesPage"),
   DelegadosTemporalesPage: () => import("@/pages/elecciones/delegados-temporales/DelegadosTemporalesPage"),
   CentrosServicioPage: () => import("@/pages/elecciones/centros-servicio/CentrosServicioPage"),
   AsignacionesPage: () => import("@/pages/elecciones/asignaciones/AsignacionesPage"),
   TemporalesACargoPage: () => import("@/pages/elecciones/temporales-a-cargo/TemporalesACargoPage"),
-  PreguntasFiscalizacionPage: () => import("@/pages/elecciones/preguntas-fiscalizacion/PreguntasFiscalizacionPage"),
+  // Fiscalizacion por fases
+  MisActividadesPage: () => import("@/pages/fiscalizacion-electoral/mis-actividades/MisActividadesPage"),
+  InformeActividadPage: () => import("@/pages/fiscalizacion-electoral/informe/InformeActividadPage"),
+  ActividadesPage: () => import("@/pages/fiscalizacion-electoral/actividades/ActividadesPage"),
+  ActividadDetailPage: () => import("@/pages/fiscalizacion-electoral/actividades/ActividadDetailPage"),
+  BandejaInformesPage: () => import("@/pages/fiscalizacion-electoral/informes/BandejaInformesPage"),
+  FasesPage: () => import("@/pages/fiscalizacion-electoral/fases/FasesPage"),
+  PlantillasPage: () => import("@/pages/fiscalizacion-electoral/plantillas/PlantillasPage"),
+  PlantillaEditorPage: () => import("@/pages/fiscalizacion-electoral/plantillas/PlantillaEditorPage"),
 } as const;
 
 type PageName = keyof typeof loaders;
@@ -70,16 +74,19 @@ export const RolesPage = lazyPage("RolesPage");
 export const AuditoriaPage = lazyPage("AuditoriaPage");
 export const ModulosPage = lazyPage("ModulosPage");
 export const PerfilPage = lazyPage("PerfilPage");
-export const FiscalizacionListPage = lazyPage("FiscalizacionListPage");
-export const FiscalizacionFormPage = lazyPage("FiscalizacionFormPage");
-export const FiscalizacionDetailPage = lazyPage("FiscalizacionDetailPage");
-export const FiscalizacionPendientesPage = lazyPage("FiscalizacionPendientesPage");
 export const PeriodosElectoralesPage = lazyPage("PeriodosElectoralesPage");
 export const DelegadosTemporalesPage = lazyPage("DelegadosTemporalesPage");
 export const CentrosServicioPage = lazyPage("CentrosServicioPage");
 export const AsignacionesPage = lazyPage("AsignacionesPage");
 export const TemporalesACargoPage = lazyPage("TemporalesACargoPage");
-export const PreguntasFiscalizacionPage = lazyPage("PreguntasFiscalizacionPage");
+export const MisActividadesPage = lazyPage("MisActividadesPage");
+export const InformeActividadPage = lazyPage("InformeActividadPage");
+export const ActividadesPage = lazyPage("ActividadesPage");
+export const ActividadDetailPage = lazyPage("ActividadDetailPage");
+export const BandejaInformesPage = lazyPage("BandejaInformesPage");
+export const FasesPage = lazyPage("FasesPage");
+export const PlantillasPage = lazyPage("PlantillasPage");
+export const PlantillaEditorPage = lazyPage("PlantillaEditorPage");
 
 let prefetched = false;
 

@@ -3,7 +3,9 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Alert, Box, Grid, Skeleton, Stack, Typography } from "@mui/material";
 import { dashboardApi } from "@/api/dashboardApi";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useModulos } from "@/hooks/useModulos";
 import { Surface } from "@/components/ui/Surface";
 
 // La tarjeta de produccion trae recharts (~330 KB con sus dependencias). Se
@@ -34,6 +36,13 @@ const REPORT_VIEW_ROLES = ["ADMINISTRADOR", "SUPERVISOR"];
 export function DashboardPage() {
   const { user } = useAuth();
   const puedeVerReportes = REPORT_VIEW_ROLES.some((r) => user?.roles.includes(r));
+  const { isElectionsEnabled } = useModulos();
+
+  // El delegado temporal solo fiscaliza: su inicio es "Mis actividades" (si el modulo esta encendido).
+  const soloDelegadoTemporal = !!user?.roles.includes("DELEGADO_TEMPORAL") && !user?.roles.includes("DIGITADOR");
+  if (soloDelegadoTemporal && isElectionsEnabled && !puedeVerReportes) {
+    return <Navigate to="/fiscalizacion-electoral/mis-actividades" replace />;
+  }
 
   if (!puedeVerReportes) {
     return <DigitadorHome fullName={user?.fullName ?? ""} />;

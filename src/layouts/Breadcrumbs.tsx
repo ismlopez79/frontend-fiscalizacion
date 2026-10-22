@@ -25,14 +25,11 @@ const LABELS: Record<string, string> = {
   perfil: "Mi cuenta",
   "cambiar-password": "Cambiar contraseña",
   elecciones: "Elecciones",
-  fiscalizacion: "Fiscalización",
-  "pendientes-revision": "Pendientes de revisión",
   "periodos-electorales": "Períodos electorales",
   "delegados-temporales": "Delegados temporales",
   "centros-servicio": "Centros de servicio",
   asignaciones: "Asignaciones",
   "temporales-a-cargo": "Temporales a cargo",
-  "preguntas-fiscalizacion": "Preguntas de fiscalización",
 };
 
 /** Un id numerico (detalle de acta, formulario) se muestra como "Detalle", no como "42". */

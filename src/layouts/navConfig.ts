@@ -18,12 +18,16 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailableOutlined";
 import PersonPinCircleIcon from "@mui/icons-material/PersonPinCircleOutlined";
 import ApartmentIcon from "@mui/icons-material/ApartmentOutlined";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonthOutlined";
-import QuizIcon from "@mui/icons-material/QuizOutlined";
-import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedInOutlined";
 import ExtensionIcon from "@mui/icons-material/ExtensionOutlined";
 import FlagIcon from "@mui/icons-material/FlagOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccountOutlined";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import TodayIcon from "@mui/icons-material/TodayOutlined";
+import EventNoteIcon from "@mui/icons-material/EventNoteOutlined";
+import InboxIcon from "@mui/icons-material/MoveToInboxOutlined";
+import TimelineIcon from "@mui/icons-material/ViewTimelineOutlined";
+import ViewQuiltIcon from "@mui/icons-material/ViewQuiltOutlined";
 
 export interface NavItem {
   label: string;
@@ -36,7 +40,7 @@ export interface NavItem {
    * apagado — refleja que FORM_CREATE/FORM_EDIT_OWN/FORM_VIEW_ALL/FORM_REVIEW
    * dejan de estar disponibles para todos los roles mientras el modulo este
    * apagado. Las paginas de preparacion de la proxima eleccion (periodos,
-   * delegados temporales, centros, asignaciones, preguntas) NO llevan esta
+   * delegados temporales, centros, asignaciones) NO llevan esta
    * bandera: esos permisos de gestion nunca se gatean, el admin los necesita
    * con el modulo apagado.
    */
@@ -124,26 +128,12 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    // Sin allowedRoles a proposito: DELEGADO_TEMPORAL/DIGITADOR deben poder
-    // ver este grupo para llegar a "Fiscalización" — cada hijo se filtra
-    // por su propio rol, igual que "Administración" arriba.
+    // Preparacion de la eleccion: cada hijo se filtra por su propio rol. La
+    // fiscalizacion vive en el grupo "Fiscalización electoral" de abajo.
     label: "Elecciones",
     path: "/elecciones",
     icon: HowToVoteIcon,
     children: [
-      {
-        label: "Fiscalización",
-        path: "/fiscalizacion",
-        icon: DescriptionIcon,
-        requiresElectionsModule: true,
-      },
-      {
-        label: "Fiscalización pendientes",
-        path: "/fiscalizacion/pendientes-revision",
-        icon: AssignmentTurnedInIcon,
-        allowedRoles: ["SUPERVISOR", "ADMINISTRADOR"],
-        requiresElectionsModule: true,
-      },
       {
         label: "Períodos electorales",
         path: "/elecciones/periodos-electorales",
@@ -175,11 +165,51 @@ export const NAV_ITEMS: NavItem[] = [
         // Permiso ASSIGNMENT_MANAGE del backend, igual que "Asignaciones".
         allowedRoles: ["ADMINISTRADOR"],
       },
+    ],
+  },
+  {
+    // Fiscalizacion por fases (capacitaciones, impresion de papeletas,
+    // votaciones...). Todo el grupo depende del modulo ELECTIONS: si GET
+    // /modulos lo reporta apagado, el menu completo desaparece.
+    label: "Fiscalización electoral",
+    path: "/fiscalizacion-electoral",
+    icon: FactCheckOutlinedIcon,
+    requiresElectionsModule: true,
+    children: [
       {
-        label: "Preguntas del formulario",
-        path: "/elecciones/preguntas-fiscalizacion",
-        icon: QuizIcon,
+        label: "Mis actividades",
+        path: "/fiscalizacion-electoral/mis-actividades",
+        icon: TodayIcon,
+        // FORM_CREATE / FORM_EDIT_OWN.
+        allowedRoles: ["DELEGADO_TEMPORAL", "DIGITADOR"],
+      },
+      {
+        label: "Actividades",
+        path: "/fiscalizacion-electoral/actividades",
+        icon: EventNoteIcon,
+        // ASSIGNMENT_MANAGE (admin); el revisor lo consulta con FORM_VIEW_ALL/FORM_REVIEW.
         allowedRoles: ["ADMINISTRADOR", "SUPERVISOR"],
+      },
+      {
+        label: "Informes",
+        path: "/fiscalizacion-electoral/informes",
+        icon: InboxIcon,
+        // FORM_REVIEW.
+        allowedRoles: ["ADMINISTRADOR", "SUPERVISOR"],
+      },
+      {
+        label: "Fases del período",
+        path: "/fiscalizacion-electoral/fases",
+        icon: TimelineIcon,
+        // ELECTORAL_PERIOD_MANAGE.
+        allowedRoles: ["ADMINISTRADOR"],
+      },
+      {
+        label: "Plantillas",
+        path: "/fiscalizacion-electoral/plantillas",
+        icon: ViewQuiltIcon,
+        // FORM_TEMPLATE_MANAGE (solo admin).
+        allowedRoles: ["ADMINISTRADOR"],
       },
     ],
   },

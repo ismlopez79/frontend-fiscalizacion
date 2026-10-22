@@ -9,8 +9,6 @@ import type {
   CreateTraineeAssignmentRequest,
   ElectoralPeriodDto,
   ElectoralPeriodRequest,
-  FiscalizationQuestionDto,
-  FiscalizationQuestionRequest,
   ServiceCenterDto,
   ServiceCenterRequest,
   TemporaryDelegateDto,
@@ -221,23 +219,3 @@ export const traineeAssignmentApi = {
   },
 };
 
-/**
- * Catalogo del checklist del formulario de fiscalizacion — mismo patron que
- * categorias de produccion / tipos de incidente (permiso CATALOG_MANAGE), no
- * vive hardcodeado en el frontend. El GET es publico (cualquier token) para
- * que el formulario del delegado pueda armarse dinamicamente.
- */
-export const fiscalizationQuestionApi = {
-  getPreguntas: async (): Promise<FiscalizationQuestionDto[]> => {
-    const { data } = await apiClient.get<FiscalizationQuestionDto[]>("/preguntas-fiscalizacion");
-    return data;
-  },
-  createPregunta: async (body: FiscalizationQuestionRequest): Promise<FiscalizationQuestionDto> => {
-    const { data } = await apiClient.post<FiscalizationQuestionDto>("/preguntas-fiscalizacion", body);
-    return data;
-  },
-  updatePregunta: async (id: number, body: FiscalizationQuestionRequest): Promise<FiscalizationQuestionDto> => {
-    const { data } = await apiClient.put<FiscalizationQuestionDto>(`/preguntas-fiscalizacion/${id}`, body);
-    return data;
-  },
-};
