@@ -264,8 +264,14 @@ export const activityFormApi = {
     });
     return data;
   },
-  enviar: async (activityId: number): Promise<ActivityFormDto> => {
-    const { data } = await apiClient.post<ActivityFormDto>(`/actividades/${activityId}/formulario/enviar`);
+  /**
+   * version = la que devolvio el ultimo autoguardado (sin ella: 400). 409
+   * FORM_EDIT_CONFLICT: otro delegado guardo cambios que no se han visto
+   * (recargar y volver a pulsar Enviar). 409 FORM_ALREADY_SUBMITTED: otro ya
+   * lo envio (mostrar el message y recargar). Ninguno se reintenta.
+   */
+  enviar: async (activityId: number, version: number): Promise<ActivityFormDto> => {
+    const { data } = await apiClient.post<ActivityFormDto>(`/actividades/${activityId}/formulario/enviar`, { version });
     return data;
   },
   aprobar: async (activityId: number, comment?: string): Promise<ActivityFormDto> => {

@@ -38,6 +38,17 @@ import { FotosActividad, PHOTOS_SECTION_ID, formPhotosKey, useFormPhotos } from 
 
 type ReviewAction = "enviar" | "aprobar" | "observar" | "rechazar" | "anular";
 
+interface ConflictNotice {
+  title: string;
+  body: string;
+}
+
+const EDIT_CONFLICT_SAVE_BODY =
+  "Cargamos la versión más reciente del informe. Revisa lo que cambió y vuelve a escribir tus últimos cambios si hace falta.";
+const EDIT_CONFLICT_SUBMIT_BODY =
+  "No se envió. Cargamos la versión más reciente con sus cambios: revísala y vuelve a pulsar «Enviar informe».";
+const ALREADY_SUBMITTED_BODY = "Cargamos el informe enviado. Ya no se puede editar mientras se revisa.";
+
 /** Quita el parentesis final ("(Nombre del coordinador(a))"): el campo ya muestra su etiqueta. */
 function stripTrailingLabel(text: string): string {
   const trimmed = text.trim();
@@ -185,7 +196,7 @@ export function InformeActividadPage() {
   // ---------------------------------------------------------------- errores por campo
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [errorsVisible, setErrorsVisible] = useState(false);
-  const [conflictNotice, setConflictNotice] = useState<string | null>(null);
+  const [conflictNotice, setConflictNotice] = useState<ConflictNotice | null>(null);
 
   const onChange = useCallback(
     (key: string, value: AnswerValue) => {
@@ -218,14 +229,38 @@ export function InformeActividadPage() {
     el?.focus({ preventScroll: true });
   }, [reducedMotion]);
 
-  // Conflicto: avisar y recargar la version del otro delegado (sin reintentar en silencio).
+  /**
+   * Conflicto con otro delegado: avisar y recargar lo que hay en el servidor.
+   * Nunca se reintenta en silencio. Si ya lo enviaron, la recarga lo deja de
+   * solo lectura (editable: false).
+   */
+  const reloadAfterConflict = useCallback(
+    (notice: ConflictNotice) => {
+      setConflictNotice(notice);
+      setFieldErrors({});
+      setErrorsVisible(false);
+      void formQuery.refetch().then((r) => {
+        if (r.data) reset(r.data);
+      });
+      void queryClient.invalidateQueries({ queryKey: formPhotosKey(activityId), exact: true });
+      queryClient.invalidateQueries({ queryKey: ["formularios-actividad"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades", "mias"] });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activityId, queryClient, reset]
+  );
+
+  const noticeFor = (code: string | undefined, message: string, context: "save" | "submit"): ConflictNotice =>
+    code === "FORM_ALREADY_SUBMITTED"
+      ? { title: message, body: ALREADY_SUBMITTED_BODY }
+      : {
+          title: context === "submit" ? "Otro delegado modificó el informe antes de que lo enviaras." : message,
+          body: context === "submit" ? EDIT_CONFLICT_SUBMIT_BODY : EDIT_CONFLICT_SAVE_BODY,
+        };
+
   useEffect(() => {
     if (!autosave.conflict) return;
-    setConflictNotice(autosave.conflict.message);
-    setFieldErrors({});
-    void formQuery.refetch().then((r) => {
-      if (r.data) reset(r.data);
-    });
+    reloadAfterConflict(noticeFor(autosave.conflict.code, autosave.conflict.message, "save"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autosave.conflict]);
 
@@ -246,9 +281,10 @@ export function InformeActividadPage() {
 
   const enviarMutation = useMutation({
     mutationFn: async () => {
-      const saved = await autosave.saveNow();
-      if (!saved) throw new Error("UNSAVED");
-      return activityFormApi.enviar(activityId);
+      // Primero termina el ultimo autoguardado; se envia la version que devolvio ese PATCH.
+      const version = await autosave.saveNow();
+      if (version === null) throw new Error("UNSAVED");
+      return activityFormApi.enviar(activityId, version);
     },
     onSuccess: (data) => {
       setFieldErrors({});
@@ -262,6 +298,11 @@ export function InformeActividadPage() {
         return;
       }
       const code = getApiErrorCode(error);
+      if (code === "FORM_EDIT_CONFLICT" || code === "FORM_ALREADY_SUBMITTED") {
+        reloadAfterConflict(noticeFor(code, getApiErrorMessage(error, "Este informe ya fue enviado."), "submit"));
+        window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+        return;
+      }
       if (code === "FORM_VALIDATION_FAILED" || code === "VALIDATION_ERROR") {
         const details = error instanceof AxiosError ? (error.response?.data?.details as string[] | undefined) : undefined;
         const parsed = parseFieldErrors(details);
@@ -454,14 +495,14 @@ export function InformeActividadPage() {
       <Collapse in={!!conflictNotice} unmountOnExit>
         <Callout
           tone="warning"
-          title={conflictNotice ?? ""}
+          title={conflictNotice?.title ?? ""}
           action={
             <IconButton size="small" aria-label="Cerrar aviso" onClick={() => setConflictNotice(null)} sx={{ mt: -0.5, mr: -0.75 }}>
               <CloseIcon fontSize="small" />
             </IconButton>
           }
         >
-          Cargamos la versión más reciente del informe. Revisa lo que cambió y vuelve a escribir tus últimos cambios si hace falta.
+          {conflictNotice?.body}
         </Callout>
       </Collapse>
 
@@ -614,6 +655,7 @@ export function InformeActividadPage() {
             maxPhotos={form.maxPhotos}
             editable={editMode && activity.active}
             onUploadingChange={setUploadingPhotos}
+            onFormLocked={(message) => reloadAfterConflict({ title: message, body: ALREADY_SUBMITTED_BODY })}
             showToast={showToast}
           />
 

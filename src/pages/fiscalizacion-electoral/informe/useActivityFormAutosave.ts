@@ -12,6 +12,8 @@ const RETRY_MS = 5000;
 
 export interface AutosaveConflict {
   message: string;
+  /** FORM_EDIT_CONFLICT (otro delegado guardo antes) o FORM_ALREADY_SUBMITTED (ya lo enviaron). */
+  code?: string;
 }
 
 /**
@@ -23,6 +25,8 @@ export interface AutosaveConflict {
  *  - 409 FORM_EDIT_CONFLICT = otro delegado guardo antes: se detiene el
  *    autoguardado y se avisa para recargar. Nunca se reintenta en silencio,
  *    porque eso pisaria lo que escribio el otro.
+ *  - 409 FORM_ALREADY_SUBMITTED = otro delegado ya lo envio: igual, se
+ *    detiene y se recarga (queda de solo lectura).
  * Un error de red si se reintenta solo (no pisa a nadie: la version no cambio).
  */
 export function useActivityFormAutosave(activityId: number) {
@@ -78,11 +82,12 @@ export function useActivityFormAutosave(activityId: number) {
         if (error instanceof AxiosError && error.response?.status === 409) {
           conflictRef.current = true;
           clearTimer();
+          const code = getApiErrorCode(error);
           const message =
-            getApiErrorCode(error) === "FORM_EDIT_CONFLICT"
+            code === "FORM_EDIT_CONFLICT"
               ? "Otro delegado modificó el informe mientras escribías."
               : getApiErrorMessage(error, "El informe cambió y ya no se puede guardar esta versión.");
-          setConflict({ message });
+          setConflict({ message, code });
           setState("error");
           return;
         }
@@ -130,14 +135,15 @@ export function useActivityFormAutosave(activityId: number) {
 
   /**
    * Guarda YA lo pendiente y espera a que termine (antes de enviar).
-   * true si todo quedo guardado; false si hubo conflicto o error.
+   * Devuelve la version que dejo el ultimo PATCH (la que pide /enviar), o
+   * null si hubo conflicto o error.
    */
-  const saveNow = useCallback(async (): Promise<boolean> => {
+  const saveNow = useCallback(async (): Promise<number | null> => {
     clearTimer();
     firstChangeAtRef.current = null;
     while (inFlightRef.current) await inFlightRef.current;
     if (dirtyRef.current) await flush();
-    return !conflictRef.current && !dirtyRef.current;
+    return conflictRef.current || dirtyRef.current ? null : versionRef.current;
   }, [flush]);
 
   // Al salir de la pantalla: manda lo pendiente (mejor esfuerzo) y avisa si se cierra la pestaña con cambios sin guardar.

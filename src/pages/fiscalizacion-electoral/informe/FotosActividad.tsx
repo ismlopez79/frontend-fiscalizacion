@@ -22,7 +22,7 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineRounded";
 import BrokenImageOutlinedIcon from "@mui/icons-material/BrokenImageOutlined";
 import { activityFormPhotoApi } from "@/api/fiscalizacionFasesApi";
-import { getApiErrorMessage, getBlobApiErrorMessage } from "@/utils/apiError";
+import { getApiErrorCode, getApiErrorMessage, getBlobApiErrorMessage } from "@/utils/apiError";
 import { downloadBlob } from "@/utils/downloadBlob";
 import { formatDateTime } from "@/utils/dateFormat";
 import { shrinkPhoto } from "@/utils/resizeImage";
@@ -98,6 +98,8 @@ interface FotosActividadProps {
   /** Informe en BORRADOR u OBSERVADA y la persona puede llenarlo. */
   editable: boolean;
   onUploadingChange?: (uploading: boolean) => void;
+  /** 409 FORM_ALREADY_SUBMITTED: otro delegado envio el informe; la pantalla lo recarga en solo lectura. */
+  onFormLocked?: (message: string) => void;
   showToast: (type: "success" | "error", message: string) => void;
 }
 
@@ -109,6 +111,7 @@ export function FotosActividad({
   maxPhotos,
   editable,
   onUploadingChange,
+  onFormLocked,
   showToast,
 }: FotosActividadProps) {
   const queryClient = useQueryClient();
@@ -139,6 +142,15 @@ export function FotosActividad({
   const refetchPhotos = useCallback(
     () => queryClient.invalidateQueries({ queryKey: formPhotosKey(activityId), exact: true }),
     [activityId, queryClient]
+  );
+  /** true si el error fue que ya enviaron el informe (lo maneja la pantalla, sin toast). */
+  const handleLocked = useCallback(
+    (error: unknown) => {
+      if (getApiErrorCode(error) !== "FORM_ALREADY_SUBMITTED") return false;
+      onFormLocked?.(getApiErrorMessage(error, "Este informe ya fue enviado."));
+      return true;
+    },
+    [onFormLocked]
   );
 
   const total = photos.length + pending.length;
@@ -184,6 +196,12 @@ export function FotosActividad({
         setPhotos((prev) => (prev.some((p) => p.id === photo.id) ? prev : [...prev, photo]));
         uploaded++;
       } catch (error) {
+        if (handleLocked(error)) {
+          // Lo que quedaba en la fila ya no se puede subir.
+          for (const rest of queued) URL.revokeObjectURL(rest.item.previewUrl);
+          setPending([]);
+          return;
+        }
         showToast("error", getApiErrorMessage(error, `No se pudo subir "${file.name}".`));
         // Puede que otro delegado haya llenado el cupo o enviado el informe: se trae la lista real.
         if (error instanceof AxiosError && error.response?.status === 409) void refetchPhotos();
@@ -213,7 +231,7 @@ export function FotosActividad({
       if (error instanceof AxiosError && error.response?.status === 404) {
         // Ya la habia borrado otro delegado.
         setPhotos((prev) => prev.filter((p) => p.id !== toDelete.id));
-      } else {
+      } else if (!handleLocked(error)) {
         showToast("error", getApiErrorMessage(error, "No se pudo eliminar la foto."));
         void refetchPhotos();
       }
@@ -328,7 +346,9 @@ export function FotosActividad({
               onZoom={(src) => setZoom({ src, alt: photo.description || `Foto ${index + 1}` })}
               onDelete={() => setToDelete(photo)}
               onSaved={(next) => setPhotos((prev) => prev.map((p) => (p.id === next.id ? next : p)))}
-              onGone={() => void refetchPhotos()}
+              onGone={(error) => {
+                if (!handleLocked(error)) void refetchPhotos();
+              }}
               showToast={showToast}
             />
           ))}
@@ -437,7 +457,7 @@ interface PhotoTileProps {
   onZoom: (src: string) => void;
   onDelete: () => void;
   onSaved: (photo: ActivityFormPhotoDto) => void;
-  onGone: () => void;
+  onGone: (error: unknown) => void;
   showToast: FotosActividadProps["showToast"];
 }
 
@@ -528,7 +548,7 @@ function DescriptionField({
   photo: ActivityFormPhotoDto;
   label: string;
   onSaved: (photo: ActivityFormPhotoDto) => void;
-  onGone: () => void;
+  onGone: (error: unknown) => void;
 }) {
   const [value, setValue] = useState(photo.description ?? "");
   const [state, setState] = useState<DescriptionState>("idle");
@@ -564,7 +584,7 @@ function DescriptionField({
       setState("saved");
     } catch (error) {
       setState("error");
-      if (error instanceof AxiosError && (error.response?.status === 404 || error.response?.status === 409)) onGone();
+      if (error instanceof AxiosError && (error.response?.status === 404 || error.response?.status === 409)) onGone(error);
     } finally {
       inFlightRef.current = false;
     }
