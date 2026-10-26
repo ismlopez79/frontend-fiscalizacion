@@ -284,8 +284,33 @@ export interface ActivityFormDto {
   submittedByName: string | null;
   reviewComment: string | null;
   template: FormTemplateDto;
+  /** Anexo fotografico. Subir o borrar una foto no cambia la version del informe. */
+  photos: ActivityFormPhotoDto[];
+  /** Fotos necesarias para enviar (ELECTION_PHOTOS_MIN en el backend). */
+  minPhotos: number;
+  /** Tope de fotos por informe (ELECTION_PHOTOS_MAX). */
+  maxPhotos: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Foto del anexo. viewUrl/downloadUrl vienen con el prefijo /api: no se usan
+ * tal cual (el cliente ya lo trae en su baseURL), se piden por id.
+ */
+export interface ActivityFormPhotoDto {
+  id: number;
+  formId: number;
+  activityId: number;
+  originalName: string;
+  description: string | null;
+  mimeType: string;
+  sizeBytes: number;
+  fileHash: string;
+  uploadedByName: string;
+  uploadedAt: string;
+  viewUrl: string;
+  downloadUrl: string;
 }
 
 export interface ActivityFormSaveResponse {

@@ -12,6 +12,7 @@ import type {
   ActivityFormDto,
   ActivityFormListFilters,
   ActivityFormListItem,
+  ActivityFormPhotoDto,
   ActivityFormSaveResponse,
   AddActivityDelegateRequest,
   Answers,
@@ -303,5 +304,55 @@ export const activityFormApi = {
     if (filters.faseId !== undefined) params.faseId = filters.faseId;
     const { data } = await apiClient.get<PageResponse<ActivityFormListItem>>("/formularios-actividad", { params });
     return data;
+  },
+};
+
+/**
+ * Anexo fotografico del informe: solo JPG o PNG de hasta 25 MB, entre
+ * minPhotos y maxPhotos por informe. Se suben, editan y borran mientras el
+ * informe esta en BORRADOR u OBSERVADA (cualquier delegado asignado o un
+ * administrador). No toca la version del informe: no choca con el
+ * autoguardado. Las imagenes llevan el header Authorization, asi que se piden
+ * como blob y se muestran con una object URL.
+ */
+export const activityFormPhotoApi = {
+  getFotos: async (activityId: number): Promise<ActivityFormPhotoDto[]> => {
+    const { data } = await apiClient.get<ActivityFormPhotoDto[]>(`/actividades/${activityId}/formulario/fotos`);
+    return data;
+  },
+  /** 409 si el tipo o el contenido no sirven, pasa de 25 MB, ya hay maxPhotos o el informe ya no se edita. */
+  subir: async (
+    activityId: number,
+    file: File,
+    descripcion?: string,
+    onProgress?: (fraction: number) => void
+  ): Promise<ActivityFormPhotoDto> => {
+    const form = new FormData();
+    form.append("file", file);
+    if (descripcion?.trim()) form.append("descripcion", descripcion.trim());
+    const { data } = await apiClient.post<ActivityFormPhotoDto>(`/actividades/${activityId}/formulario/fotos`, form, {
+      onUploadProgress: onProgress ? (e) => e.total && onProgress(e.loaded / e.total) : undefined,
+    });
+    return data;
+  },
+  /** Copia reducida (JPG, 1600 px de lado mayor, ya enderezada): para miniaturas y vista ampliada. */
+  ver: async (fotoId: number): Promise<Blob> => {
+    const { data } = await apiClient.get(`/formularios-actividad/fotos/${fotoId}/ver`, { responseType: "blob" });
+    return data;
+  },
+  /** El archivo original, tal como se subio. */
+  descargar: async (fotoId: number): Promise<Blob> => {
+    const { data } = await apiClient.get(`/formularios-actividad/fotos/${fotoId}/descargar`, { responseType: "blob" });
+    return data;
+  },
+  /** Maximo 300 caracteres. */
+  actualizarDescripcion: async (fotoId: number, description: string): Promise<ActivityFormPhotoDto> => {
+    const { data } = await apiClient.patch<ActivityFormPhotoDto>(`/formularios-actividad/fotos/${fotoId}`, {
+      description,
+    });
+    return data;
+  },
+  eliminar: async (fotoId: number): Promise<void> => {
+    await apiClient.delete(`/formularios-actividad/fotos/${fotoId}`);
   },
 };

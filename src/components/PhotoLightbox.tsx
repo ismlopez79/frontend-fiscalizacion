@@ -11,15 +11,17 @@ interface PhotoLightboxProps {
   src: string | null;
   alt: string;
   onClose: () => void;
+  /** circle: foto de perfil. rect: foto completa, sin recortar (ej. anexo de un informe). */
+  shape?: "circle" | "rect";
 }
 
 /**
- * Foto de perfil ampliada en un circulo al centro de la pantalla. Se cierra
+ * Foto ampliada al centro de la pantalla (en circulo para la de perfil). Se cierra
  * al pulsar fuera de la foto o con Escape. Modal de MUI por debajo: bloquea
  * el scroll, atrapa el foco y, si se abre encima del drawer de perfil,
  * Escape solo cierra la foto (el modal de arriba).
  */
-export function PhotoLightbox({ open, src, alt, onClose }: PhotoLightboxProps) {
+export function PhotoLightbox({ open, src, alt, onClose, shape = "circle" }: PhotoLightboxProps) {
   const reducedMotion = useReducedMotion();
   // mounted: el Modal existe en el DOM. visible: estado final de la transicion.
   // Separados para poder animar la salida antes de desmontar.
@@ -74,10 +76,9 @@ export function PhotoLightbox({ open, src, alt, onClose }: PhotoLightboxProps) {
           // Pulsar la foto no cierra: solo el area de afuera.
           onClick={(e) => e.stopPropagation()}
           sx={{
-            width: "min(72vmin, 380px)",
-            aspectRatio: "1",
-            borderRadius: "50%",
-            objectFit: "cover",
+            ...(shape === "circle"
+              ? { width: "min(72vmin, 380px)", aspectRatio: "1", borderRadius: "50%", objectFit: "cover" }
+              : { maxWidth: "min(100%, 1200px)", maxHeight: "calc(100dvh - 32px)", borderRadius: "14px", objectFit: "contain" }),
             cursor: "default",
             border: "4px solid rgba(255, 255, 255, 0.9)",
             boxShadow: "0 24px 64px rgba(15, 23, 42, 0.45), 0 4px 12px rgba(15, 23, 42, 0.25)",

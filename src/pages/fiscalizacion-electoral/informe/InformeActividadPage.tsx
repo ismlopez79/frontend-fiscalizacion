@@ -34,6 +34,7 @@ import type { ActivityFormDto, AnswerValue, Answers, FormTemplateDto } from "@/t
 import { TemplateRenderer, fieldDomId } from "../components/TemplateRenderer";
 import { ActivityFacts, DELEGATE_ROLES, REVIEWER_ROLES, feRoutes } from "../fiscalizacionFasesUi";
 import { useActivityFormAutosave } from "./useActivityFormAutosave";
+import { FotosActividad, PHOTOS_SECTION_ID, formPhotosKey, useFormPhotos } from "./FotosActividad";
 
 type ReviewAction = "enviar" | "aprobar" | "observar" | "rechazar" | "anular";
 
@@ -155,6 +156,12 @@ export function InformeActividadPage() {
     staleTime: 5 * 60_000,
   });
 
+  const photosQuery = useFormPhotos(activityId, form?.photos, !!form);
+  const photos = photosQuery.data ?? [];
+  const minPhotos = form?.minPhotos ?? 0;
+  const photosMissing = Math.max(0, minPhotos - photos.length);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
   const autosave = useActivityFormAutosave(activityId);
   const { reset } = autosave;
 
@@ -204,6 +211,12 @@ export function InformeActividadPage() {
     },
     [reducedMotion]
   );
+
+  const goToPhotos = useCallback(() => {
+    const el = document.getElementById(PHOTOS_SECTION_ID);
+    el?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+    el?.focus({ preventScroll: true });
+  }, [reducedMotion]);
 
   // Conflicto: avisar y recargar la version del otro delegado (sin reintentar en silencio).
   useEffect(() => {
@@ -259,6 +272,11 @@ export function InformeActividadPage() {
           return;
         }
       }
+      // 409 por fotos faltantes (p. ej. otro delegado borro una): se trae la lista real y se lleva al anexo.
+      if (error instanceof AxiosError && error.response?.status === 409 && /foto/i.test(getApiErrorMessage(error, ""))) {
+        void queryClient.invalidateQueries({ queryKey: formPhotosKey(activityId), exact: true });
+        goToPhotos();
+      }
       showToast("error", getApiErrorMessage(error, "No se pudo enviar el informe."));
     },
   });
@@ -305,6 +323,10 @@ export function InformeActividadPage() {
       setFieldErrors(missing);
       setErrorsVisible(true);
       goToField(Object.keys(missing)[0]);
+      return;
+    }
+    if (photosMissing > 0) {
+      goToPhotos();
       return;
     }
     setConfirm("enviar");
@@ -584,6 +606,17 @@ export function InformeActividadPage() {
             parties={parties}
           />
 
+          <FotosActividad
+            activityId={activityId}
+            photos={photos}
+            loading={photosQuery.isFetching}
+            minPhotos={minPhotos}
+            maxPhotos={form.maxPhotos}
+            editable={editMode && activity.active}
+            onUploadingChange={setUploadingPhotos}
+            showToast={showToast}
+          />
+
           {editMode && progress && (
             <Stack
               direction="row"
@@ -607,6 +640,11 @@ export function InformeActividadPage() {
                   </Box>{" "}
                   respondidas
                 </Typography>
+                {photosMissing > 0 && (
+                  <Typography variant="caption" component="div" sx={{ fontVariantNumeric: "tabular-nums", color: designTokens.status.warning.fg }}>
+                    {photosMissing === 1 ? "Falta 1 foto del anexo" : `Faltan ${photosMissing} fotos del anexo`}
+                  </Typography>
+                )}
                 {progress.required > 0 && (
                   <Typography
                     variant="caption"
@@ -627,9 +665,9 @@ export function InformeActividadPage() {
                 size="large"
                 startIcon={enviarMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
                 onClick={handleSubmitClick}
-                disabled={enviarMutation.isPending || !!autosave.conflict}
+                disabled={enviarMutation.isPending || !!autosave.conflict || photosMissing > 0 || uploadingPhotos}
               >
-                {enviarMutation.isPending ? "Enviando…" : isResend ? "Reenviar informe" : "Enviar informe"}
+                {enviarMutation.isPending ? "Enviando…" : uploadingPhotos ? "Subiendo fotos…" : isResend ? "Reenviar informe" : "Enviar informe"}
               </Button>
             </Stack>
           )}
