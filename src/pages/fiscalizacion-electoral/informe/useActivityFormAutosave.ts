@@ -83,10 +83,13 @@ export function useActivityFormAutosave(activityId: number) {
           conflictRef.current = true;
           clearTimer();
           const code = getApiErrorCode(error);
-          const message =
+          // El message del backend ya viene listo para mostrar (dice que paso y, si lo enviaron, quien y cuando).
+          const message = getApiErrorMessage(
+            error,
             code === "FORM_EDIT_CONFLICT"
               ? "Otro delegado modificó el informe mientras escribías."
-              : getApiErrorMessage(error, "El informe cambió y ya no se puede guardar esta versión.");
+              : "El informe cambió y ya no se puede guardar esta versión."
+          );
           setConflict({ message, code });
           setState("error");
           return;

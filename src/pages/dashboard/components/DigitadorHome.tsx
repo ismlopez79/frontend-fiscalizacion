@@ -8,6 +8,7 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { actaApi } from "@/api/actaApi";
 import { EstadoActaChip } from "@/components/EstadoActaChip";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Callout } from "@/components/ui/Callout";
 import { SectionHeader, Surface } from "@/components/ui/Surface";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { designTokens } from "@/theme/theme";
@@ -28,9 +29,44 @@ export function DigitadorHome({ fullName }: { fullName: string }) {
   });
   const recientes = recientesQuery.data?.content ?? [];
 
+  // Actas devueltas por el revisor: se corrigen y se reenvian (rechazar ya no es definitivo).
+  const rechazadasQuery = useQuery({
+    queryKey: ["actas", "mias", "por-corregir", "RECHAZADA"],
+    queryFn: () => actaApi.getActas({ createdByMe: true, status: "RECHAZADA" }, 0, 1),
+  });
+  const observadasQuery = useQuery({
+    queryKey: ["actas", "mias", "por-corregir", "OBSERVADA"],
+    queryFn: () => actaApi.getActas({ createdByMe: true, status: "OBSERVADA" }, 0, 1),
+  });
+  const rechazadas = rechazadasQuery.data?.totalElements ?? 0;
+  const observadas = observadasQuery.data?.totalElements ?? 0;
+
   return (
     <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ flexShrink: 0, pb: 2, maxWidth: 880, width: "100%" }}>
       <PageHeader title={`Hola, ${firstName}`} subtitle="Desde aquí puedes crear tus actas y darles seguimiento." />
+
+      {(rechazadas > 0 || observadas > 0) && (
+        <Callout
+          tone={rechazadas > 0 ? "error" : "warning"}
+          title={
+            rechazadas + observadas === 1 ? "Tienes 1 acta por corregir" : `Tienes ${rechazadas + observadas} actas por corregir`
+          }
+        >
+          El revisor te las devolvió con un comentario. Corrígelas y reenvíalas a revisión.
+          <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1 }}>
+            {rechazadas > 0 && (
+              <Button size="small" variant="outlined" color="error" onClick={() => navigate("/actas?estado=RECHAZADA")}>
+                {rechazadas === 1 ? "Ver 1 rechazada" : `Ver ${rechazadas} rechazadas`}
+              </Button>
+            )}
+            {observadas > 0 && (
+              <Button size="small" variant="outlined" color="warning" onClick={() => navigate("/actas?estado=OBSERVADA")}>
+                {observadas === 1 ? "Ver 1 observada" : `Ver ${observadas} observadas`}
+              </Button>
+            )}
+          </Stack>
+        </Callout>
+      )}
 
       <Surface sx={{ py: { xs: 0.5, md: 1 } }}>
         <Stack divider={<Divider flexItem sx={{ borderColor: "rgba(15, 23, 42, 0.06)" }} />}>
@@ -44,7 +80,7 @@ export function DigitadorHome({ fullName }: { fullName: string }) {
           <ActionRow
             icon={<DescriptionOutlinedIcon />}
             title="Mis actas"
-            description="Consulta el estado de tus actas, corrige las observadas y envía a revisión."
+            description="Consulta el estado de tus actas, corrige las observadas o rechazadas y envíalas a revisión."
             onClick={() => navigate("/actas")}
           />
         </Stack>

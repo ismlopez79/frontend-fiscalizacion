@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
+import { RevisionesHistorial } from "@/components/RevisionesHistorial";
 import { EstadoActaChip } from "@/components/EstadoActaChip";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader, Surface } from "@/components/ui/Surface";
@@ -45,8 +46,7 @@ interface ConflictNotice {
 
 const EDIT_CONFLICT_SAVE_BODY =
   "Cargamos la versión más reciente del informe. Revisa lo que cambió y vuelve a escribir tus últimos cambios si hace falta.";
-const EDIT_CONFLICT_SUBMIT_BODY =
-  "No se envió. Cargamos la versión más reciente con sus cambios: revísala y vuelve a pulsar «Enviar informe».";
+const EDIT_CONFLICT_SUBMIT_BODY = "No se envió. Ya cargamos la versión más reciente: revísala y vuelve a pulsar «Enviar informe».";
 const ALREADY_SUBMITTED_BODY = "Cargamos el informe enviado. Ya no se puede editar mientras se revisa.";
 
 /** Quita el parentesis final ("(Nombre del coordinador(a))"): el campo ya muestra su etiqueta. */
@@ -250,13 +250,16 @@ export function InformeActividadPage() {
     [activityId, queryClient, reset]
   );
 
-  const noticeFor = (code: string | undefined, message: string, context: "save" | "submit"): ConflictNotice =>
-    code === "FORM_ALREADY_SUBMITTED"
-      ? { title: message, body: ALREADY_SUBMITTED_BODY }
-      : {
-          title: context === "submit" ? "Otro delegado modificó el informe antes de que lo enviaras." : message,
-          body: context === "submit" ? EDIT_CONFLICT_SUBMIT_BODY : EDIT_CONFLICT_SAVE_BODY,
-        };
+  /** El titulo es siempre el message del backend, tal cual; el cuerpo solo dice que hicimos. */
+  const noticeFor = (code: string | undefined, message: string, context: "save" | "submit"): ConflictNotice => ({
+    title: message,
+    body:
+      code === "FORM_ALREADY_SUBMITTED"
+        ? ALREADY_SUBMITTED_BODY
+        : context === "submit"
+          ? EDIT_CONFLICT_SUBMIT_BODY
+          : EDIT_CONFLICT_SAVE_BODY,
+  });
 
   useEffect(() => {
     if (!autosave.conflict) return;
@@ -299,7 +302,9 @@ export function InformeActividadPage() {
       }
       const code = getApiErrorCode(error);
       if (code === "FORM_EDIT_CONFLICT" || code === "FORM_ALREADY_SUBMITTED") {
-        reloadAfterConflict(noticeFor(code, getApiErrorMessage(error, "Este informe ya fue enviado."), "submit"));
+        const fallback =
+          code === "FORM_ALREADY_SUBMITTED" ? "Este informe ya fue enviado." : "Otro delegado modificó el informe antes de que lo enviaras.";
+        reloadAfterConflict(noticeFor(code, getApiErrorMessage(error, fallback), "submit"));
         window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
         return;
       }
@@ -425,7 +430,12 @@ export function InformeActividadPage() {
   const canReview = isReviewer && status === "PENDIENTE_REVISION";
   const canAnular = isAdmin && !!form && status !== "ANULADA";
   const canPdf = !!form?.submittedAt;
-  const isResend = status === "OBSERVADA";
+  // Rechazar ya no es definitivo: una rechazada se corrige y reenvia igual que una observada (manda editable).
+  const isResend = status === "OBSERVADA" || status === "RECHAZADA";
+  const reviews = form?.reviews ?? [];
+  const historyButton = reviews.length > 0 && <RevisionesHistorial reviews={reviews} />;
+  const reviewCalloutShown =
+    !!form?.reviewComment && (status === "OBSERVADA" || status === "RECHAZADA" || status === "ANULADA" || status === "APROBADA");
   const progress = form ? progressOf(form.template, autosave.answers) : null;
   const errorKeys = Object.keys(fieldErrors);
   const parties = partiesQuery.data ?? [];
@@ -512,7 +522,9 @@ export function InformeActividadPage() {
         </Callout>
       )}
 
-      {form?.reviewComment && (status === "OBSERVADA" || status === "RECHAZADA" || status === "ANULADA" || status === "APROBADA") && (
+      {historyButton && !reviewCalloutShown && <Box sx={{ mt: { xs: -1, md: -1.5 }, ml: -0.75 }}>{historyButton}</Box>}
+
+      {form?.reviewComment && reviewCalloutShown && (
         <Callout
           tone={status === "OBSERVADA" ? "warning" : status === "APROBADA" ? "success" : "error"}
           title={
@@ -528,15 +540,16 @@ export function InformeActividadPage() {
           <Box component="span" sx={{ whiteSpace: "pre-line" }}>
             {form.reviewComment}
           </Box>
-          {status === "OBSERVADA" && editMode && (
+          {isResend && editMode && (
             <Box component="span" sx={{ display: "block", mt: 0.75, color: designTokens.textSecondary }}>
-              Cualquiera de los delegados puede corregirlo y reenviarlo; conserva su número.
+              Cualquiera de los delegados puede corregirlo, cambiar las fotos y reenviarlo; conserva su número.
             </Box>
           )}
+          {historyButton && <Box sx={{ mt: 1, ml: -0.75 }}>{historyButton}</Box>}
         </Callout>
       )}
 
-      {status === "OBSERVADA" && canPdf && editMode && (
+      {isResend && canPdf && editMode && (
         <Typography variant="caption" component="p" sx={{ mt: -1 }}>
           El PDF muestra el envío anterior hasta que se reenvíe.
         </Typography>
@@ -684,7 +697,7 @@ export function InformeActividadPage() {
                 </Typography>
                 {photosMissing > 0 && (
                   <Typography variant="caption" component="div" sx={{ fontVariantNumeric: "tabular-nums", color: designTokens.status.warning.fg }}>
-                    {photosMissing === 1 ? "Falta 1 foto del anexo" : `Faltan ${photosMissing} fotos del anexo`}
+                    {minPhotos === 1 ? "Agregue al menos 1 foto de la actividad" : `Agregue al menos ${minPhotos} fotos de la actividad`}
                   </Typography>
                 )}
                 {progress.required > 0 && (
@@ -758,7 +771,7 @@ export function InformeActividadPage() {
       <ConfirmacionAccion
         open={confirm === "rechazar"}
         titulo="Rechazar informe"
-        descripcion="El informe quedará rechazado. Solo un administrador podrá anularlo después."
+        descripcion="Vuelve a los delegados con tu comentario, con todas sus respuestas y fotos, para que lo corrijan y lo reenvíen. Solo anular es definitivo."
         requiereComentario
         variant="destructive"
         confirmLabel="Rechazar"

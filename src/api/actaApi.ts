@@ -11,6 +11,7 @@ import type {
   BulkApprovalResultDto,
   CreateActaRequest,
   CreateBorradorRequest,
+  ReviewHistoryDto,
   UpdateBorradorRequest,
 } from "@/types/acta";
 
@@ -43,6 +44,11 @@ export const actaApi = {
     const { data } = await apiClient.get<ActaResponse>(`/actas/${id}`);
     return data;
   },
+  /** Decisiones del revisor sobre el acta (la pantalla las ordena). El autor solo ve las de sus actas. */
+  getRevisiones: async (id: number): Promise<ReviewHistoryDto[]> => {
+    const { data } = await apiClient.get<ReviewHistoryDto[]>(`/actas/${id}/revisiones`);
+    return data;
+  },
   /** Bandeja de revisor: endpoint dedicado, no es /actas con filtro de status. */
   getPendientesRevision: async (page: number, size: number): Promise<PageResponse<ActaResponse>> => {
     const { data } = await apiClient.get<PageResponse<ActaResponse>>("/actas/pendientes-revision", {
@@ -60,7 +66,7 @@ export const actaApi = {
     return data;
   },
   /**
-   * Corrige un acta en REGISTRADA u OBSERVADA: mismo body que createActa,
+   * Corrige un acta en REGISTRADA, OBSERVADA o RECHAZADA: mismo body que createActa,
    * sin cambiar el departamento (su numero pertenece a el). Responde el acta
    * completa con el total recalculado y el mismo numero y estado. 409 si el
    * acta ya no esta en un estado corregible; 403 si no es del usuario.
@@ -139,10 +145,6 @@ export const actaApi = {
     const { data } = await apiClient.post<ActaResponse>(`/actas/${id}/enviar-revision`);
     return data;
   },
-  reanudar: async (id: number): Promise<ActaResponse> => {
-    const { data } = await apiClient.post<ActaResponse>(`/actas/${id}/reanudar`);
-    return data;
-  },
   /** El comentario es opcional (el backend acepta omitirlo o { comment: null }). */
   aprobar: async (id: number, comment?: string): Promise<ActaResponse> => {
     const body: ActaCommentRequest = comment ? { comment } : {};
@@ -196,7 +198,7 @@ export const actaApi = {
     return data;
   },
   /**
-   * Solo permitido mientras el acta esta en REGISTRADA u OBSERVADA (el
+   * Solo permitido mientras el acta esta en REGISTRADA, OBSERVADA o RECHAZADA (el
    * backend responde 400 BUSINESS_RULE_VIOLATION fuera de esos estados,
    * ej. si el estado cambio mientras la pantalla estaba abierta).
    */

@@ -316,7 +316,7 @@ export const activityFormApi = {
 /**
  * Anexo fotografico del informe: solo JPG o PNG de hasta 25 MB, entre
  * minPhotos y maxPhotos por informe. Se suben, editan y borran mientras el
- * informe esta en BORRADOR u OBSERVADA (cualquier delegado asignado o un
+ * informe esta en BORRADOR, OBSERVADA o RECHAZADA (cualquier delegado asignado o un
  * administrador). No toca la version del informe: no choca con el
  * autoguardado. Las imagenes llevan el header Authorization, asi que se piden
  * como blob y se muestran con una object URL.

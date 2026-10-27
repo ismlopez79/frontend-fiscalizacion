@@ -1,4 +1,5 @@
 import type { ActaStatus } from "@/theme/statusTokens";
+import type { ReviewHistoryDto } from "@/types/acta";
 
 /**
  * Fiscalizacion por fases: territorio, plantillas de formulario, fases del
@@ -283,6 +284,8 @@ export interface ActivityFormDto {
   submittedAt: string | null;
   submittedByName: string | null;
   reviewComment: string | null;
+  /** Historial de decisiones del revisor (aprobar, observar, rechazar, anular). */
+  reviews: ReviewHistoryDto[];
   template: FormTemplateDto;
   /** Anexo fotografico. Subir o borrar una foto no cambia la version del informe. */
   photos: ActivityFormPhotoDto[];

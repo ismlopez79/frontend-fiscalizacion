@@ -8,6 +8,7 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import { auditApi } from "@/api/auditApi";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { etiquetaEstado } from "@/utils/estados";
 import { AuditActionChip } from "@/components/AuditActionChip";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
@@ -109,7 +110,7 @@ export function AuditoriaPage() {
         // tabla aunque el backend si trae la info.
         valueGetter: (_value, row) => {
           if (row.oldValue || row.newValue) {
-            return `${row.oldValue ?? "—"} → ${row.newValue ?? "—"}`;
+            return `${row.oldValue ? etiquetaEstado(row.oldValue) : "—"} → ${row.newValue ? etiquetaEstado(row.newValue) : "—"}`;
           }
           return row.extraInfo ?? "—";
         },
@@ -346,7 +347,7 @@ function ValueBox({ label, value, tone }: { label: string; value: string | null;
           textDecorationColor: "rgba(15, 23, 42, 0.3)",
         }}
       >
-        {value ?? "Vacío"}
+        {value ? etiquetaEstado(value) : "Vacío"}
       </Typography>
     </Box>
   );

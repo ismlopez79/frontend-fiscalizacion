@@ -448,12 +448,12 @@ export function ActaFormPage() {
         </Stack>
       );
     }
-    if (editActa.status !== "REGISTRADA" && editActa.status !== "OBSERVADA") {
+    if (editActa.status !== "REGISTRADA" && editActa.status !== "OBSERVADA" && editActa.status !== "RECHAZADA") {
       return (
         <CenteredNotice
           icon={<EditOffOutlinedIcon />}
           title="Esta acta ya no se puede corregir"
-          body="Solo se corrigen actas en estado Registrada u Observada. Una vez enviada a revisión, el acta queda bloqueada hasta que un revisor la apruebe u observe."
+          body="Solo se corrigen actas en estado Registrada, Observada o Rechazada. Una vez enviada a revisión, el acta queda bloqueada hasta que un revisor la apruebe, la observe o la rechace."
           actions={
             <Button variant="contained" onClick={() => navigate(`/actas/${id}`)}>
               Ir al detalle del acta
@@ -554,6 +554,17 @@ export function ActaFormPage() {
                   : "Registra los datos del acta y sus producciones. El sistema calcula los totales por ti."
             }
           />
+
+          {isEdit && editActa?.reviewComment && (editActa.status === "OBSERVADA" || editActa.status === "RECHAZADA") && (
+            <Callout
+              tone={editActa.status === "RECHAZADA" ? "error" : "warning"}
+              title={editActa.status === "RECHAZADA" ? "Motivo del rechazo" : "El revisor pidió correcciones"}
+            >
+              <Box component="span" sx={{ whiteSpace: "pre-line" }}>
+                {editActa.reviewComment}
+              </Box>
+            </Callout>
+          )}
 
           {isPractice && (
             <Callout tone="warning" title="MODO PRÁCTICA — nada de esto se registra">

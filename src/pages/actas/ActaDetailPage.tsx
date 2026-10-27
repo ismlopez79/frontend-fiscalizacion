@@ -26,7 +26,6 @@ import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import SendIcon from "@mui/icons-material/SendOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import ReplayIcon from "@mui/icons-material/ReplayOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
@@ -40,6 +39,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsTemporaryDelegate } from "@/hooks/useMyAccount";
 import { EstadoActaChip } from "@/components/EstadoActaChip";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
+import { RevisionesHistorial } from "@/components/RevisionesHistorial";
 import { designTokens } from "@/theme/theme";
 import { useToast } from "@/hooks/useToast";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
@@ -48,10 +48,14 @@ import { SectionHeader, Surface } from "@/components/ui/Surface";
 import { Callout } from "@/components/ui/Callout";
 import { DetailRow } from "@/components/ui/DetailRow";
 import type { ActaFileDto, ProduccionResponse } from "@/types/acta";
+import type { ActaStatus } from "@/theme/statusTokens";
 import { AcompanantesList, actaNumberFormatter as fmt, formatActaDate, formatActaDateTime, formatTime } from "./actaUi";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "application/pdf"];
+
+/** Estados en que el dueño corrige el acta (datos y archivos) y la reenvia. Rechazar ya no es definitivo: solo Anular. */
+const CORREGIBLE: ActaStatus[] = ["REGISTRADA", "OBSERVADA", "RECHAZADA"];
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -69,7 +73,7 @@ export function ActaDetailPage() {
 
   const { toast, showToast, closeToast } = useToast();
   const [confirmAction, setConfirmAction] = useState<
-    "enviar-revision" | "reanudar" | "aprobar" | "observar" | "rechazar" | "anular" | null
+    "enviar-revision" | "aprobar" | "observar" | "rechazar" | "anular" | null
   >(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -124,15 +128,6 @@ export function ActaDetailPage() {
       showToast("success", "Acta enviada a revisión.");
     },
     onError: (error) => showToast("error", getApiErrorMessage(error, "No se pudo enviar a revisión.")),
-  });
-
-  const reanudarMutation = useMutation({
-    mutationFn: () => actaApi.reanudar(actaId),
-    onSuccess: () => {
-      invalidateActa();
-      showToast("success", "Acta reanudada. Ya puedes corregirla y reenviarla.");
-    },
-    onError: (error) => showToast("error", getApiErrorMessage(error, "No se pudo reanudar el acta.")),
   });
 
   const aprobarMutation = useMutation({
@@ -280,12 +275,18 @@ export function ActaDetailPage() {
     );
   }
 
-  const canSendToReview = canAct && (acta.status === "REGISTRADA" || acta.status === "OBSERVADA");
-  const canResume = canAct && acta.status === "OBSERVADA";
-  // PUT /actas/{id}: el dueño (o el administrador) corrige los datos mientras
-  // el acta siga en REGISTRADA u OBSERVADA.
-  const canEdit = canAct && (acta.status === "REGISTRADA" || acta.status === "OBSERVADA");
-  const canUploadFiles = canAct && (acta.status === "REGISTRADA" || acta.status === "OBSERVADA");
+  // Observada o rechazada se corrige y se reenvia directo (enviar-revision): ya no hace falta reanudar.
+  const corregible = CORREGIBLE.includes(acta.status);
+  const canSendToReview = canAct && corregible;
+  // PUT /actas/{id}: el dueño (o el administrador) corrige los datos.
+  const canEdit = canAct && corregible;
+  const canUploadFiles = canAct && corregible;
+  const returned = acta.status === "OBSERVADA" || acta.status === "RECHAZADA";
+  // Historial: el revisor ve todas las decisiones; el autor, las de sus actas.
+  const showHistory = (canAct || isReviewer) && acta.status !== "BORRADOR" && acta.status !== "REGISTRADA";
+  const historyButton = showHistory && (
+    <RevisionesHistorial queryKey={["actas", actaId, "revisiones"]} fetchReviews={() => actaApi.getRevisiones(actaId)} />
+  );
   // El backend exige al menos un archivo adjunto para poder enviar a
   // revision (409 BUSINESS_RULE_VIOLATION si no). Mientras la lista de
   // archivos no termina de cargar, tratamos "sin archivos" por defecto —
@@ -338,16 +339,6 @@ export function ActaDetailPage() {
                 Corregir
               </Button>
             )}
-            {canResume && (
-              <Button
-                variant="outlined"
-                startIcon={<ReplayIcon />}
-                onClick={() => setConfirmAction("reanudar")}
-                disabled={reanudarMutation.isPending}
-              >
-                Reanudar para corregir
-              </Button>
-            )}
             {canSendToReview && (
               <Tooltip
                 title={
@@ -363,7 +354,7 @@ export function ActaDetailPage() {
                     onClick={() => setConfirmAction("enviar-revision")}
                     disabled={enviarRevisionMutation.isPending || sendToReviewBlockedByFiles}
                   >
-                    Enviar a revisión
+                    {returned ? "Reenviar a revisión" : "Enviar a revisión"}
                   </Button>
                 </span>
               </Tooltip>
@@ -405,12 +396,27 @@ export function ActaDetailPage() {
         }
       />
 
-      {(acta.status === "OBSERVADA" || acta.hasDiscrepancy || acta.possibleDuplicate) && (
+      {historyButton && !returned && <Box sx={{ mt: { xs: -1, md: -1.5 }, ml: -0.75 }}>{historyButton}</Box>}
+
+      {(returned || acta.hasDiscrepancy || acta.possibleDuplicate) && (
         <Stack spacing={1.25}>
-          {acta.status === "OBSERVADA" && (
-            <Callout tone="info" title="El revisor observó esta acta">
-              El motivo todavía no viaja en esta pantalla — consulta con el revisor qué hay que corregir. Usa
-              «Corregir» para cambiar los datos y luego vuelve a enviarla a revisión.
+          {returned && (
+            <Callout
+              tone={acta.status === "RECHAZADA" ? "error" : "warning"}
+              title={acta.status === "RECHAZADA" ? "El revisor rechazó esta acta" : "El revisor pidió correcciones"}
+            >
+              {acta.reviewComment && (
+                <Box component="span" sx={{ display: "block", whiteSpace: "pre-line", color: "text.primary" }}>
+                  {acta.reviewComment}
+                </Box>
+              )}
+              {canAct && (
+                <Box component="span" sx={{ display: "block", mt: acta.reviewComment ? 0.75 : 0, color: designTokens.textSecondary }}>
+                  Usa «Corregir» para cambiar los datos y, si hace falta, cambia la foto en «Archivos». Luego reenvíala a
+                  revisión: conserva su número.
+                </Box>
+              )}
+              {historyButton && <Box sx={{ mt: 1, ml: -0.75 }}>{historyButton}</Box>}
             </Callout>
           )}
           {acta.hasDiscrepancy && (
@@ -719,23 +725,11 @@ export function ActaDetailPage() {
       <ConfirmacionAccion
         open={confirmAction === "enviar-revision"}
         titulo="Enviar acta a revisión"
-        descripcion="El acta pasará a estado Pendiente de revisión y ya no podrás editarla hasta que un revisor la apruebe u observe."
+        descripcion="El acta pasará a estado Pendiente de revisión y ya no podrás editarla hasta que un revisor la apruebe, la observe o la rechace."
         confirmLabel="Enviar"
         onConfirm={() => {
           setConfirmAction(null);
           enviarRevisionMutation.mutate();
-        }}
-        onCancel={() => setConfirmAction(null)}
-      />
-
-      <ConfirmacionAccion
-        open={confirmAction === "reanudar"}
-        titulo="Reanudar acta observada"
-        descripcion="El acta volverá a estado Registrada para que puedas corregirla y enviarla de nuevo a revisión."
-        confirmLabel="Reanudar"
-        onConfirm={() => {
-          setConfirmAction(null);
-          reanudarMutation.mutate();
         }}
         onCancel={() => setConfirmAction(null)}
       />
@@ -768,7 +762,7 @@ export function ActaDetailPage() {
       <ConfirmacionAccion
         open={confirmAction === "rechazar"}
         titulo="Rechazar acta"
-        descripcion="El acta quedará en estado Rechazada. Esta acción no se puede deshacer, salvo anulándola."
+        descripcion="El acta vuelve al digitador con tu comentario, con todos sus datos y archivos, para que la corrija y la reenvíe. Solo anular es definitivo."
         requiereComentario
         variant="destructive"
         confirmLabel="Rechazar"

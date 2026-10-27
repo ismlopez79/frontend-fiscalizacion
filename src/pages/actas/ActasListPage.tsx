@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Box, Button, Collapse, IconButton, InputAdornment, MenuItem, Paper, Stack, TextField } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
@@ -37,6 +37,7 @@ const SCOPE_OPTIONS: { value: Scope; label: string }[] = [
 
 export function ActasListPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const isDigitador = !!user?.roles.includes("DIGITADOR") && user.roles.length === 1;
   // El delegado temporal fiscaliza duicentros con el mismo flujo que el
@@ -50,7 +51,11 @@ export function ActasListPage() {
   const canPractice = isTrainingEnabled && PRACTICE_ROLES.some((r) => user?.roles.includes(r));
 
   const [onlyMine, setOnlyMine] = useState(isDigitador || isTemporary);
-  const [statusFilter, setStatusFilter] = useState<ActaStatus | "">("");
+  // ?estado=RECHAZADA: llega asi desde el aviso "actas por corregir" del inicio.
+  const [statusFilter, setStatusFilter] = useState<ActaStatus | "">(() => {
+    const estado = searchParams.get("estado");
+    return estado && (ALL_STATUSES as string[]).includes(estado) ? (estado as ActaStatus) : "";
+  });
   const [actaNumberInput, setActaNumberInput] = useState("");
   const [actaNumberFilter, setActaNumberFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");

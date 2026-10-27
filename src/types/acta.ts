@@ -107,6 +107,11 @@ export interface ActaResponse {
   rnpnDelegateName: string | null;
   duicentroChiefName: string | null;
   status: ActaStatus;
+  /**
+   * Comentario de la ultima decision del revisor (observar, rechazar...). Se
+   * limpia al reenviar; el historial completo queda en GET /actas/{id}/revisiones.
+   */
+  reviewComment: string | null;
   observations: string | null;
   declaredTotal: number | null;
   /** SIEMPRE recalculado por el backend — el frontend nunca confia en su propio calculo. */
@@ -126,6 +131,19 @@ export interface ActaResponse {
   incidentes: IncidenteResponse[];
   /** Lista vacia si el acta no registro acompañantes. */
   acompanantes: ActaAcompananteDto[];
+}
+
+/**
+ * Una decision del revisor (aprobar, observar, rechazar, anular), tal como
+ * queda en el historial. Misma forma para actas e informes de actividad.
+ */
+export interface ReviewHistoryDto {
+  id: number;
+  /** Estado en que dejo la decision. */
+  status: ActaStatus;
+  comment: string | null;
+  reviewerName: string;
+  reviewedAt: string;
 }
 
 /**

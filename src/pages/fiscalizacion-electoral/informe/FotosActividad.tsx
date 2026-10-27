@@ -95,7 +95,7 @@ interface FotosActividadProps {
   loading?: boolean;
   minPhotos: number;
   maxPhotos: number;
-  /** Informe en BORRADOR u OBSERVADA y la persona puede llenarlo. */
+  /** Informe editable (BORRADOR, OBSERVADA o RECHAZADA) y la persona puede llenarlo. */
   editable: boolean;
   onUploadingChange?: (uploading: boolean) => void;
   /** 409 FORM_ALREADY_SUBMITTED: otro delegado envio el informe; la pantalla lo recarga en solo lectura. */
