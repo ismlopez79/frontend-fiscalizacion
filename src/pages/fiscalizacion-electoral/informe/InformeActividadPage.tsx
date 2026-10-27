@@ -17,6 +17,7 @@ import { catalogApi } from "@/api/catalogApi";
 import { getApiErrorCode, getApiErrorMessage, getBlobApiErrorMessage } from "@/utils/apiError";
 import { downloadBlob } from "@/utils/downloadBlob";
 import { formatDateTime } from "@/utils/dateFormat";
+import { tituloRevision, ultimaRevision } from "@/utils/revisiones";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
@@ -527,22 +528,15 @@ export function InformeActividadPage() {
       {form?.reviewComment && reviewCalloutShown && (
         <Callout
           tone={status === "OBSERVADA" ? "warning" : status === "APROBADA" ? "success" : "error"}
-          title={
-            status === "OBSERVADA"
-              ? "El revisor pidió correcciones"
-              : status === "APROBADA"
-                ? "Comentario del revisor"
-                : status === "RECHAZADA"
-                  ? "Motivo del rechazo"
-                  : "Motivo de la anulación"
-          }
+          title={tituloRevision("informe", status, ultimaRevision(reviews, status))}
         >
           <Box component="span" sx={{ whiteSpace: "pre-line" }}>
-            {form.reviewComment}
+            {status === "APROBADA" ? "Comentario" : "Motivo"}: {form.reviewComment}
           </Box>
           {isResend && editMode && (
             <Box component="span" sx={{ display: "block", mt: 0.75, color: designTokens.textSecondary }}>
-              Cualquiera de los delegados puede corregirlo, cambiar las fotos y reenviarlo; conserva su número.
+              Corrige lo indicado y envíalo de nuevo. Cualquiera de los delegados puede corregirlo y cambiar las fotos;
+              conserva su número.
             </Box>
           )}
           {historyButton && <Box sx={{ mt: 1, ml: -0.75 }}>{historyButton}</Box>}

@@ -112,12 +112,12 @@ export function ActaPracticaResultado({ acta, onRestart, onExit }: ActaPracticaR
 
       <Callout tone="warning" title="MODO PRÁCTICA — esta acta no se registró">
         Así se vería tu acta una vez registrada. Nada de esto se guardó: no existe en el sistema, no consumió numeración
-        y ningún revisor la verá. Para registrar un acta real usa «Nueva acta».
+        y ningún supervisor la verá. Para registrar un acta real usa «Nueva acta».
       </Callout>
 
       {sent ? (
         <Callout tone="success" title="Envío a revisión simulado">
-          Con un acta real, aquí pasaría a Pendiente de revisión y ya no podrías editarla hasta que un revisor la apruebe
+          Con un acta real, aquí pasaría a Pendiente de revisión y ya no podrías editarla hasta que un supervisor la apruebe
           u observe.
         </Callout>
       ) : (

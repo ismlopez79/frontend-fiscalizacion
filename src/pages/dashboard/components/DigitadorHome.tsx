@@ -52,7 +52,7 @@ export function DigitadorHome({ fullName }: { fullName: string }) {
             rechazadas + observadas === 1 ? "Tienes 1 acta por corregir" : `Tienes ${rechazadas + observadas} actas por corregir`
           }
         >
-          El revisor te las devolvió con un comentario. Corrígelas y reenvíalas a revisión.
+          Un supervisor te las devolvió con un comentario. Corrígelas y reenvíalas a revisión.
           <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1 }}>
             {rechazadas > 0 && (
               <Button size="small" variant="outlined" color="error" onClick={() => navigate("/actas?estado=RECHAZADA")}>

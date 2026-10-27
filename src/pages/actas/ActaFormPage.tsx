@@ -44,6 +44,7 @@ import type { AcompananteOption } from "./AcompanantesField";
 import { DraftGoneError, snapshotToCreateRequest, useActaDraftAutosave } from "./useActaDraftAutosave";
 import { OBSERVACIONES_FIELD_ID, ObservacionesField } from "./ObservacionesField";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { tituloRevision, ultimaRevision } from "@/utils/revisiones";
 import { actaNumberFormatter as fmt, formatActaDate } from "./actaUi";
 
 const CAN_CHOOSE_JVE_ROLES = ["ADMINISTRADOR", "SUPERVISOR"];
@@ -209,6 +210,13 @@ export function ActaFormPage() {
     enabled: isEdit && Number.isFinite(editId),
   });
   const editActa = editActaQuery.data;
+  const editReturned = editActa?.status === "OBSERVADA" || editActa?.status === "RECHAZADA";
+  // Quien la devolvio y cuando (misma clave que el historial del detalle).
+  const editRevisionesQuery = useQuery({
+    queryKey: ["actas", editId, "revisiones"],
+    queryFn: () => actaApi.getRevisiones(editId),
+    enabled: isEdit && Number.isFinite(editId) && editReturned,
+  });
   const [editLoaded, setEditLoaded] = useState(false);
   useEffect(() => {
     if (editLoaded || !editActa) return;
@@ -453,7 +461,7 @@ export function ActaFormPage() {
         <CenteredNotice
           icon={<EditOffOutlinedIcon />}
           title="Esta acta ya no se puede corregir"
-          body="Solo se corrigen actas en estado Registrada, Observada o Rechazada. Una vez enviada a revisión, el acta queda bloqueada hasta que un revisor la apruebe, la observe o la rechace."
+          body="Solo se corrigen actas en estado Registrada, Observada o Rechazada. Una vez enviada a revisión, el acta queda bloqueada hasta que un supervisor la apruebe, la observe o la rechace."
           actions={
             <Button variant="contained" onClick={() => navigate(`/actas/${id}`)}>
               Ir al detalle del acta
@@ -555,20 +563,23 @@ export function ActaFormPage() {
             }
           />
 
-          {isEdit && editActa?.reviewComment && (editActa.status === "OBSERVADA" || editActa.status === "RECHAZADA") && (
+          {isEdit && editActa?.reviewComment && editReturned && (
             <Callout
               tone={editActa.status === "RECHAZADA" ? "error" : "warning"}
-              title={editActa.status === "RECHAZADA" ? "Motivo del rechazo" : "El revisor pidió correcciones"}
+              title={tituloRevision("acta", editActa.status, ultimaRevision(editRevisionesQuery.data, editActa.status))}
             >
               <Box component="span" sx={{ whiteSpace: "pre-line" }}>
-                {editActa.reviewComment}
+                Motivo: {editActa.reviewComment}
+              </Box>
+              <Box component="span" sx={{ display: "block", mt: 0.75, color: designTokens.textSecondary }}>
+                Corrige lo indicado, guarda y envíala de nuevo a revisión desde el detalle del acta.
               </Box>
             </Callout>
           )}
 
           {isPractice && (
             <Callout tone="warning" title="MODO PRÁCTICA — nada de esto se registra">
-              Esta acta es solo para practicar: no se guarda en el sistema, no consume numeración y ningún revisor la
+              Esta acta es solo para practicar: no se guarda en el sistema, no consume numeración y ningún supervisor la
               verá. Lo que escribas se conserva únicamente en este navegador hasta que termines.
             </Callout>
           )}

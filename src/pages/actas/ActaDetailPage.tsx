@@ -34,6 +34,7 @@ import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import { actaApi } from "@/api/actaApi";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { tituloRevision, ultimaRevision } from "@/utils/revisiones";
 import { downloadBlob } from "@/utils/downloadBlob";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsTemporaryDelegate } from "@/hooks/useMyAccount";
@@ -111,6 +112,14 @@ export function ActaDetailPage() {
   const isAdmin = !!user?.roles.includes("ADMINISTRADOR");
   const isReviewer = isAdmin || !!user?.roles.includes("SUPERVISOR");
   const canAct = isOwner || isAdmin;
+  const returnedStatus = acta?.status === "OBSERVADA" || acta?.status === "RECHAZADA";
+  // Quien la devolvio y cuando, para el aviso. Misma clave que el dialogo de
+  // historial, asi abrirlo no vuelve a pedirlas.
+  const revisionesQuery = useQuery({
+    queryKey: ["actas", actaId, "revisiones"],
+    queryFn: () => actaApi.getRevisiones(actaId),
+    enabled: Number.isFinite(actaId) && returnedStatus && (canAct || isReviewer),
+  });
 
   /**
    * Prefijo, no solo ["actas", actaId]: cualquier accion de revision puede
@@ -403,16 +412,16 @@ export function ActaDetailPage() {
           {returned && (
             <Callout
               tone={acta.status === "RECHAZADA" ? "error" : "warning"}
-              title={acta.status === "RECHAZADA" ? "El revisor rechazó esta acta" : "El revisor pidió correcciones"}
+              title={tituloRevision("acta", acta.status, ultimaRevision(revisionesQuery.data, acta.status))}
             >
               {acta.reviewComment && (
                 <Box component="span" sx={{ display: "block", whiteSpace: "pre-line", color: "text.primary" }}>
-                  {acta.reviewComment}
+                  Motivo: {acta.reviewComment}
                 </Box>
               )}
               {canAct && (
                 <Box component="span" sx={{ display: "block", mt: acta.reviewComment ? 0.75 : 0, color: designTokens.textSecondary }}>
-                  Usa «Corregir» para cambiar los datos y, si hace falta, cambia la foto en «Archivos». Luego reenvíala a
+                  Corrige lo indicado con «Corregir» (y, si hace falta, cambia la foto en «Archivos») y envíala de nuevo a
                   revisión: conserva su número.
                 </Box>
               )}
@@ -725,7 +734,7 @@ export function ActaDetailPage() {
       <ConfirmacionAccion
         open={confirmAction === "enviar-revision"}
         titulo="Enviar acta a revisión"
-        descripcion="El acta pasará a estado Pendiente de revisión y ya no podrás editarla hasta que un revisor la apruebe, la observe o la rechace."
+        descripcion="El acta pasará a estado Pendiente de revisión y ya no podrás editarla hasta que un supervisor la apruebe, la observe o la rechace."
         confirmLabel="Enviar"
         onConfirm={() => {
           setConfirmAction(null);
