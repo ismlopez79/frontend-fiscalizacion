@@ -9,6 +9,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopyOutlined";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { formTemplateApi } from "@/api/fiscalizacionFasesApi";
 import { catalogApi } from "@/api/catalogApi";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -75,6 +76,14 @@ export function PlantillaEditorPage() {
   );
 
   const partiesQuery = useQuery({ queryKey: ["partidos-politicos"], queryFn: catalogApi.getPartidosPoliticos, staleTime: 5 * 60_000 });
+
+  // Solo puede haber un borrador por codigo: si ya existe, se abre ese en vez de crear otra version.
+  const draftsQuery = useQuery({
+    queryKey: ["plantillas-formulario", "BORRADOR"],
+    queryFn: () => formTemplateApi.getPlantillas("BORRADOR"),
+    enabled: template?.status === "PUBLICADA",
+  });
+  const openDraft = template ? draftsQuery.data?.find((d) => d.code === template.code && d.id !== template.id) ?? null : null;
 
   const [draft, setDraft] = useState<EditorDraft>(() => emptyDraft());
   const [dirty, setDirty] = useState(false);
@@ -198,7 +207,11 @@ export function PlantillaEditorPage() {
         showToast("success", action === "publicar" ? `Publicada v${result.version}: las fases que la usan ya la toman.` : "Plantilla archivada.");
       }
     },
-    onError: (error) => onServerError(error, "No se pudo completar la acción."),
+    onError: (error, action) => {
+      onServerError(error, "No se pudo completar la acción.");
+      // Puede que otro usuario ya haya abierto un borrador: se refresca para ofrecer abrirlo.
+      if (action === "nueva-version") queryClient.invalidateQueries({ queryKey: ["plantillas-formulario", "BORRADOR"] });
+    },
   });
 
   const backButton = (
@@ -270,9 +283,15 @@ export function PlantillaEditorPage() {
                 <Button color="inherit" startIcon={<ArchiveOutlinedIcon />} onClick={() => setConfirm("archivar")} disabled={busy}>
                   Archivar
                 </Button>
-                <Button variant="contained" startIcon={<ContentCopyIcon />} onClick={() => setConfirm("nueva-version")} disabled={busy}>
-                  Nueva versión
-                </Button>
+                {openDraft ? (
+                  <Button variant="contained" startIcon={<EditOutlinedIcon />} onClick={() => navigate(feRoutes.plantilla(openDraft.id))} disabled={busy}>
+                    Abrir borrador v{openDraft.version}
+                  </Button>
+                ) : (
+                  <Button variant="contained" startIcon={<ContentCopyIcon />} onClick={() => setConfirm("nueva-version")} disabled={busy}>
+                    Nueva versión
+                  </Button>
+                )}
               </>
             )}
             {editable && (
@@ -302,7 +321,9 @@ export function PlantillaEditorPage() {
       {template && template.status !== "BORRADOR" && (
         <Callout tone="info" title={template.status === "PUBLICADA" ? "Publicada: ya no se edita" : "Archivada"}>
           {template.status === "PUBLICADA"
-            ? "Para cambiarla, crea una nueva versión, edita ese borrador y publícalo. Los informes ya llenos conservan la versión con la que se hicieron."
+            ? openDraft
+              ? `Ya hay un borrador v${openDraft.version} en curso: ábrelo para seguir editándolo y publícalo cuando esté listo. Los informes ya llenos conservan la versión con la que se hicieron.`
+              : "Para cambiarla, crea una nueva versión, edita ese borrador y publícalo. Los informes ya llenos conservan la versión con la que se hicieron."
             : "Este formato fue retirado. Sus informes anteriores siguen intactos."}
         </Callout>
       )}
