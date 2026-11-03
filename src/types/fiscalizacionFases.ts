@@ -189,6 +189,23 @@ export interface ActivityDto {
   electionType: ElectionType | null;
   notes: string | null;
   active: boolean;
+  /** Tope de fotos que aplica a esta actividad (el propio o el por defecto del backend). */
+  maxPhotos: number;
+  /** true si la actividad tiene su propio tope; false si usa el por defecto (ELECTION_PHOTOS_MAX). */
+  customMaxPhotos: boolean;
+  /**
+   * Codigo del estado del informe, solo para logica (nunca se muestra; para eso
+   * reportStatusLabel). null = nadie lo ha abierto. string y no el enum: si el
+   * backend agrega un estado, la pantalla no se rompe.
+   */
+  reportStatus: string | null;
+  /** Texto del estado del informe para mostrar ("Sin iniciar", "Pendiente de revisión"...). */
+  reportStatusLabel: string;
+  /**
+   * Misma regla con la que el backend bloquea el PUT y los cambios de
+   * delegados: false = no se corrige, cancela/reactiva ni se toca el equipo.
+   */
+  editable: boolean;
   delegates: ActivityDelegateDto[];
   createdAt: string;
   updatedAt: string;
@@ -216,6 +233,8 @@ export interface CreateActivityRequest {
   /** Maximo 30 cada uno. userIds deben ser usuarios con rol DIGITADOR. */
   temporaryDelegateIds: number[];
   userIds: number[];
+  /** 1..MAX_PHOTOS_LIMIT; null = usa el por defecto del backend. */
+  maxPhotos: number | null;
 }
 
 /** Igual que el POST pero sin fase ni delegados, y con active (false = cancelar). */
@@ -227,7 +246,16 @@ export interface UpdateActivityRequest {
   electionType: ElectionType | null;
   notes: string | null;
   active: boolean;
+  /**
+   * Es PUT: null (o no enviarlo) vuelve al por defecto. Reenviar el actual si
+   * customMaxPhotos; ver activityToUpdateBody. 409 si queda por debajo de las
+   * fotos ya subidas.
+   */
+  maxPhotos: number | null;
 }
+
+/** Limite que acepta el backend para maxPhotos de una actividad. */
+export const MAX_PHOTOS_LIMIT = 50;
 
 /**
  * Un delegado no puede estar en dos actividades activas el mismo dia (sea
@@ -291,7 +319,7 @@ export interface ActivityFormDto {
   photos: ActivityFormPhotoDto[];
   /** Fotos necesarias para enviar (ELECTION_PHOTOS_MIN en el backend). */
   minPhotos: number;
-  /** Tope de fotos por informe (ELECTION_PHOTOS_MAX). */
+  /** Tope de fotos de la actividad (el suyo o ELECTION_PHOTOS_MAX por defecto). */
   maxPhotos: number;
   createdAt: string;
   updatedAt: string;

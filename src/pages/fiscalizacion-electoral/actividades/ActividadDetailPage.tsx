@@ -9,7 +9,7 @@ import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlin
 import PersonRemoveOutlinedIcon from "@mui/icons-material/PersonRemoveOutlined";
 import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
-import { activityApi, activityFormApi, phaseApi } from "@/api/fiscalizacionFasesApi";
+import { activityApi, activityFormApi, activityToUpdateBody, phaseApi } from "@/api/fiscalizacionFasesApi";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader, Surface } from "@/components/ui/Surface";
 import { Callout } from "@/components/ui/Callout";
@@ -65,7 +65,9 @@ export function ActividadDetailPage() {
     enabled: Number.isFinite(activityId),
   });
   const form = formQuery.data ?? null;
-  const locked = !!form?.submittedAt;
+  // Lo decide el backend (misma regla con la que rechaza el PUT y los cambios de delegados).
+  const locked = !!activity && !activity.editable;
+  const lockedText = activity ? `El informe ya fue enviado (${activity.reportStatusLabel}); la actividad no se puede modificar.` : "";
 
   const fasesQuery = useQuery({
     queryKey: ["fases", activity?.electoralPeriodId ?? null, "todas"],
@@ -83,15 +85,7 @@ export function ActividadDetailPage() {
 
   const toggleMutation = useMutation({
     mutationFn: () =>
-      activityApi.actualizar(activityId, {
-        activityDate: activity!.activityDate,
-        districtId: activity!.districtId,
-        placeName: activity!.placeName,
-        address: activity!.address,
-        electionType: activity!.electionType,
-        notes: activity!.notes,
-        active: !activity!.active,
-      }),
+      activityApi.actualizar(activityId, activityToUpdateBody(activity!, !activity!.active)),
     onSuccess: (saved) => {
       queryClient.setQueryData(["actividades", activityId], saved);
       refresh();
@@ -155,7 +149,7 @@ export function ActividadDetailPage() {
         actions={
           canManage && (
             <>
-              <Tooltip title={locked ? "El informe ya se envió: la actividad no se puede cambiar." : ""}>
+              <Tooltip title={locked ? lockedText : ""}>
                 <span>
                   <Button
                     color={activity.active ? "error" : "success"}
@@ -167,7 +161,7 @@ export function ActividadDetailPage() {
                   </Button>
                 </span>
               </Tooltip>
-              <Tooltip title={locked ? "El informe ya se envió: la actividad no se puede cambiar." : ""}>
+              <Tooltip title={locked ? lockedText : ""}>
                 <span>
                   <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditOpen(true)} disabled={locked}>
                     Corregir
@@ -181,7 +175,7 @@ export function ActividadDetailPage() {
 
       {locked && (
         <Callout tone="info" title="Equipo y datos fijados">
-          El informe ya se envió, así que la actividad y sus delegados no se pueden cambiar.
+          {lockedText}
         </Callout>
       )}
 
@@ -199,6 +193,11 @@ export function ActividadDetailPage() {
           <DetailRow label="Dirección" value={activity.address} />
           {activity.electionType && <DetailRow label="Elección" value={ELECTION_TYPE_LABELS[activity.electionType]} />}
           <DetailRow label="Indicaciones" value={activity.notes} />
+          <DetailRow
+            label="Máximo de fotos"
+            value={`${activity.maxPhotos}${activity.customMaxPhotos ? "" : " (por defecto)"}`}
+            numeric
+          />
         </Box>
       </Surface>
 

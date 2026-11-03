@@ -8,12 +8,13 @@ import EditIcon from "@mui/icons-material/EditOutlined";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
-import { activityApi, phaseApi } from "@/api/fiscalizacionFasesApi";
+import { activityApi, activityToUpdateBody, phaseApi } from "@/api/fiscalizacionFasesApi";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Callout } from "@/components/ui/Callout";
 import { DataTable } from "@/components/ui/DataTable";
 import { FloatingToolbar, toolbarFieldSx } from "@/components/ui/FloatingToolbar";
 import { ConfirmacionAccion } from "@/components/ConfirmacionAccion";
+import { EstadoActaChip } from "@/components/EstadoActaChip";
 import { ToastSnackbar } from "@/components/ToastSnackbar";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,17 +28,8 @@ import { TerritorioFields } from "../components/TerritorioFields";
 import { ActivityStateChip, DelegateStack, districtLine, feRoutes } from "../fiscalizacionFasesUi";
 import { ActividadFormDialog } from "./ActividadFormDialog";
 
-/** Cuerpo del PUT a partir de la fila (para cancelar/reactivar sin abrir el formulario). */
-function toUpdateBody(a: ActivityDto, active: boolean) {
-  return {
-    activityDate: a.activityDate,
-    districtId: a.districtId,
-    placeName: a.placeName,
-    address: a.address,
-    electionType: a.electionType,
-    notes: a.notes,
-    active,
-  };
+function lockedHint(a: ActivityDto) {
+  return `El informe ya fue enviado (${a.reportStatusLabel}); la actividad no se puede modificar.`;
 }
 
 /**
@@ -104,7 +96,7 @@ export function ActividadesPage() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (a: ActivityDto) => activityApi.actualizar(a.id, toUpdateBody(a, !a.active)),
+    mutationFn: (a: ActivityDto) => activityApi.actualizar(a.id, activityToUpdateBody(a, !a.active)),
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["actividades"] });
       showToast("success", saved.active ? "Actividad reactivada." : "Actividad cancelada.");
@@ -180,6 +172,19 @@ export function ActividadesPage() {
         width: 120,
         renderCell: (p) => <ActivityStateChip active={p.row.active} />,
       },
+      {
+        field: "reportStatusLabel",
+        headerName: "Informe",
+        width: 190,
+        sortable: false,
+        renderCell: (p) =>
+          // El codigo solo elige color e icono (gris neutro si no se conoce); el texto es el del backend.
+          p.row.reportStatus ? (
+            <EstadoActaChip estado={p.row.reportStatus} label={p.row.reportStatusLabel} />
+          ) : (
+            <Typography variant="caption">{p.row.reportStatusLabel}</Typography>
+          ),
+      },
       ...(canManage
         ? [
             {
@@ -190,20 +195,25 @@ export function ActividadesPage() {
               align: "right",
               renderCell: (p) => (
                 <Stack direction="row" gap={0.5} onClick={(e) => e.stopPropagation()}>
-                  <Tooltip title="Corregir">
-                    <IconButton size="small" aria-label="Corregir actividad" onClick={() => setEditing(p.row)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
+                  <Tooltip title={p.row.editable ? "Corregir" : lockedHint(p.row)}>
+                    <span>
+                      <IconButton size="small" aria-label="Corregir actividad" disabled={!p.row.editable} onClick={() => setEditing(p.row)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </span>
                   </Tooltip>
-                  <Tooltip title={p.row.active ? "Cancelar actividad" : "Reactivar actividad"}>
-                    <IconButton
-                      size="small"
-                      aria-label={p.row.active ? "Cancelar actividad" : "Reactivar actividad"}
-                      onClick={() => setToToggle(p.row)}
-                      sx={{ color: p.row.active ? designTokens.status.error.fg : designTokens.status.success.fg }}
-                    >
-                      {p.row.active ? <EventBusyOutlinedIcon fontSize="small" /> : <EventAvailableOutlinedIcon fontSize="small" />}
-                    </IconButton>
+                  <Tooltip title={!p.row.editable ? lockedHint(p.row) : p.row.active ? "Cancelar actividad" : "Reactivar actividad"}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        aria-label={p.row.active ? "Cancelar actividad" : "Reactivar actividad"}
+                        disabled={!p.row.editable}
+                        onClick={() => setToToggle(p.row)}
+                        sx={{ color: p.row.active ? designTokens.status.error.fg : designTokens.status.success.fg }}
+                      >
+                        {p.row.active ? <EventBusyOutlinedIcon fontSize="small" /> : <EventAvailableOutlinedIcon fontSize="small" />}
+                      </IconButton>
+                    </span>
                   </Tooltip>
                 </Stack>
               ),

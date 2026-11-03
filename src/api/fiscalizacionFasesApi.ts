@@ -32,6 +32,24 @@ import type {
   UpdatePhaseRequest,
 } from "@/types/fiscalizacionFases";
 
+/**
+ * Cuerpo del PUT con los datos actuales de la actividad (para cancelar o
+ * reactivar sin tocar nada mas). Reenvia el tope propio de fotos: si se
+ * mandara null, el backend lo devolveria al valor por defecto.
+ */
+export function activityToUpdateBody(a: ActivityDto, active: boolean = a.active): UpdateActivityRequest {
+  return {
+    activityDate: a.activityDate,
+    districtId: a.districtId,
+    placeName: a.placeName,
+    address: a.address,
+    electionType: a.electionType,
+    notes: a.notes,
+    active,
+    maxPhotos: a.customMaxPhotos ? a.maxPhotos : null,
+  };
+}
+
 type RawCatalogEntry = string | { code?: string; name?: string; label?: string; description?: string; options?: unknown };
 
 function entryCode(entry: RawCatalogEntry): string {

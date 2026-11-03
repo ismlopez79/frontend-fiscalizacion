@@ -23,7 +23,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { designTokens } from "@/theme/theme";
 import type { ElectoralPeriodDto } from "@/types/electoral";
-import { ELECTION_TYPES, ELECTION_TYPE_LABELS } from "@/types/fiscalizacionFases";
+import { ELECTION_TYPES, ELECTION_TYPE_LABELS, MAX_PHOTOS_LIMIT } from "@/types/fiscalizacionFases";
 import type { ActivityDelegateType, ActivityDto, ElectionType, PhaseDto } from "@/types/fiscalizacionFases";
 import { TerritorioFields } from "../components/TerritorioFields";
 import { DelegateMultiPicker, busyText, delegateKey, useDelegadosDisponibles } from "../components/DelegatePicker";
@@ -41,6 +41,13 @@ const schema = z.object({
   notes: z.string().trim().max(1000, "Máximo 1000 caracteres"),
   temporaryDelegateIds: z.array(z.number()).max(MAX_DELEGATES, `Máximo ${MAX_DELEGATES}`),
   userIds: z.array(z.number()).max(MAX_DELEGATES, `Máximo ${MAX_DELEGATES}`),
+  /** Vacio = usa el tope por defecto del backend. */
+  maxPhotos: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^\d+$/.test(v), "Escribe un número entero")
+    .refine((v) => v === "" || Number(v) >= 1, "Debe ser al menos 1")
+    .refine((v) => v === "" || Number(v) <= MAX_PHOTOS_LIMIT, `No puede ser mayor que ${MAX_PHOTOS_LIMIT}`),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -67,6 +74,7 @@ function emptyValues(phases: PhaseDto[]): FormValues {
     notes: "",
     temporaryDelegateIds: [],
     userIds: [],
+    maxPhotos: "",
   };
 }
 
@@ -104,6 +112,8 @@ export function ActividadFormDialog({ open, activity, period, phases, onClose, o
             notes: activity.notes ?? "",
             temporaryDelegateIds: [],
             userIds: [],
+            // Solo se precarga si es propio; si usa el por defecto queda vacio (y se reenvia null).
+            maxPhotos: activity.customMaxPhotos ? String(activity.maxPhotos) : "",
           }
         : emptyValues(phases)
     );
@@ -183,6 +193,7 @@ export function ActividadFormDialog({ open, activity, period, phases, onClose, o
         address: v.address.trim() || null,
         electionType: needsElectionType ? v.electionType : null,
         notes: v.notes.trim() || null,
+        maxPhotos: v.maxPhotos.trim() ? Number(v.maxPhotos) : null,
       };
       return activity
         ? activityApi.actualizar(activity.id, { ...common, active: activity.active })
@@ -337,6 +348,28 @@ export function ActividadFormDialog({ open, activity, period, phases, onClose, o
                   minRows={2}
                   error={!!errors.notes}
                   helperText={errors.notes?.message}
+                />
+              )}
+            />
+
+            <Controller
+              name="maxPhotos"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  label="Máximo de fotos (opcional)"
+                  placeholder={isEdit && !activity.customMaxPhotos ? String(activity.maxPhotos) : undefined}
+                  fullWidth
+                  inputProps={{ inputMode: "numeric", maxLength: 2 }}
+                  error={!!errors.maxPhotos}
+                  helperText={
+                    errors.maxPhotos?.message ??
+                    `De 1 a ${MAX_PHOTOS_LIMIT}. Vacío usa el máximo por defecto${
+                      isEdit && !activity.customMaxPhotos ? ` (${activity.maxPhotos})` : ""
+                    }.${isEdit ? " No puede quedar por debajo de las fotos ya subidas." : ""}`
+                  }
+                  sx={{ "& input": { fontVariantNumeric: "tabular-nums" } }}
                 />
               )}
             />
